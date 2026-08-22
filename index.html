@@ -148,6 +148,15 @@ body{
 .lg{width:20px;height:3px;border-radius:2px;display:inline-block}
 .lg-theo{background:#C7C7CC;background-image:repeating-linear-gradient(90deg,#C7C7CC 0 4px,transparent 4px 7px)}
 .lg-act{background:#007AFF}
+/* ===== 打卡日历 ===== */
+.ck-week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:12px 0 6px}
+.ck-week span{text-align:center;font-size:12px;color:#8E8E93}
+.ck-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.ck-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:13px;border-radius:8px;background:#F2F2F7;color:#3C3C43}
+.ck-today{outline:2px solid #007AFF;outline-offset:-2px;background:#fff}
+.ck-on{background:rgba(0,122,255,.85);color:#fff;font-weight:700}
+.ck-future{background:transparent;color:#D1D1D6}
+.ck-empty{background:transparent;pointer-events:none}
 
 /* ===================== 我的页 ===================== */
 .mine-head{display:flex;align-items:center;gap:14px}
@@ -968,6 +977,7 @@ async function renderStats() {
   const mastered = progs.filter(p => p.stage >= 6).length;
   const fav = progs.filter(p => p.favorite).length;
   const streak = calcStreak(map);
+  const ck = calcCheckin(map);
 
   el.innerHTML =
     '<div class="page-head"><h1>统计</h1></div>' +
@@ -977,6 +987,16 @@ async function renderStats() {
       '<div class="stat-cell"><b>' + fav + '</b><span>收藏</span></div>' +
       '<div class="stat-cell"><b>' + streak + '</b><span>连续天数</span></div>' +
     '</div></div>' +
+    '<div class="home-card">' +
+      '<h3>📅 本月打卡</h3>' +
+      '<div class="stat-grid4">' +
+        '<div class="stat-cell"><b>' + ck.month + '</b><span>本月打卡</span></div>' +
+        '<div class="stat-cell"><b>' + ck.total + '</b><span>累计打卡</span></div>' +
+        '<div class="stat-cell"><b>' + streak + '</b><span>当前连续</span></div>' +
+      '</div>' +
+      '<div id="checkinGrid"></div>' +
+      '<div class="home-tip">完成一次学习即自动打卡</div>' +
+    '</div>' +
     '<div class="home-card">' +
       '<h3>🔥 近 90 天学习热力图</h3>' +
       '<div class="heatmap" id="heatmap"></div>' +
@@ -988,6 +1008,7 @@ async function renderStats() {
       '<div class="curve-legend"><span class="lg lg-theo"></span>理论艾宾浩斯<span class="lg lg-act"></span>实际记忆保留率</div>' +
     '</div>';
   renderHeatmap(el, map);
+  renderCheckinGrid(el, map);
   drawCurve(el);
 }
 
@@ -997,6 +1018,44 @@ function calcStreak(map) {
   if (!map[toISO(t)]) t.setDate(t.getDate() - 1);
   while (map[toISO(t)] > 0) { streak++; t.setDate(t.getDate() - 1); }
   return streak;
+}
+
+function calcCheckin(map) {
+  const t = new Date();
+  const prefix = t.getFullYear() + '-' + pad2(t.getMonth() + 1);
+  let month = 0, total = 0;
+  for (const iso in map) {
+    if (map[iso] > 0) {
+      total++;
+      if (iso.slice(0, 7) === prefix) month++;
+    }
+  }
+  return { month, total };
+}
+
+function renderCheckinGrid(el, map) {
+  const box = el.querySelector('#checkinGrid');
+  if (!box) return;
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  const offset = (new Date(y, m, 1).getDay() + 6) % 7;   // 周一开始
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const today = todayISO();
+  const week = ['一', '二', '三', '四', '五', '六', '日'];
+  let html = '<div class="ck-week">' + week.map(d => '<span>' + d + '</span>').join('') + '</div><div class="ck-grid">';
+  for (let i = 0; i < offset; i++) html += '<div class="ck-cell ck-empty"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = y + '-' + pad2(m + 1) + '-' + pad2(d);
+    const n = map[iso] || 0;
+    const future = iso > today;
+    let cls = 'ck-cell';
+    if (future) cls += ' ck-future';
+    else if (n > 0) cls += ' ck-on';
+    if (iso === today) cls += ' ck-today';
+    html += '<div class="' + cls + '" title="' + iso + (n ? '：打卡 ' + n + ' 词' : '') + '">' + d + '</div>';
+  }
+  html += '</div>';
+  box.innerHTML = html;
 }
 
 function heatColor(n, max) {
