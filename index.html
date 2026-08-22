@@ -1094,8 +1094,8 @@ async function renderMine() {
   const learned = progs.filter(p => p.stage >= 1).length;
   const mastered = progs.filter(p => p.stage >= 6).length;
   const fav = progs.filter(p => p.favorite).length;
-  const url = (await getSetting('supabaseUrl')) || '';
-  const key = (await getSetting('supabaseKey')) || '';
+  const url = (await getSetting('supabaseUrl')) || 'https://jlkkjiqinczpongntaoa.supabase.co';
+  const key = (await getSetting('supabaseKey')) || 'sb_publishable_8xJ3XhBItQTmQ-9GBSHp_A_lwl7L71Z';
   const lastSync = await getSetting('lastSyncAt');
 
   el.innerHTML =
@@ -1199,25 +1199,33 @@ async function syncNow() {
     // 进度合并
     const pMap = {}; (await getAll('progress')).forEach(p => { pMap[p.word] = p; });
     const pushP = [];
+    const remoteSeenP = new Set();
     (rp || []).forEach(remote => {
+      remoteSeenP.add(remote.word);
       const l = pMap[remote.word];
       const ru = remote.updated_at || 0;
       if (!l) { pMap[remote.word] = prLocal(remote); pushP.push(remote); }
       else if (ru > (l.updatedAt || 0)) { pMap[remote.word] = prLocal(remote); pushP.push(remote); }
       else if (ru < (l.updatedAt || 0)) { pushP.push(prRemote(l)); }
     });
+    // 补传本地有而云端没有的记录（换设备首次同步必须，否则本地数据会丢）
+    for (const word in pMap) if (!remoteSeenP.has(word)) pushP.push(prRemote(pMap[word]));
     for (const word in pMap) await put('progress', pMap[word]);
 
     // 统计合并
     const sMap = {}; (await getAll('stats')).forEach(s => { sMap[s.date] = s; });
     const pushS = [];
+    const remoteSeenS = new Set();
     (rs || []).forEach(remote => {
+      remoteSeenS.add(remote.date);
       const l = sMap[remote.date];
       const ru = remote.updated_at || 0;
       if (!l) { sMap[remote.date] = stLocal(remote); pushS.push(remote); }
       else if (ru > (l.updatedAt || 0)) { sMap[remote.date] = stLocal(remote); pushS.push(remote); }
       else if (ru < (l.updatedAt || 0)) { pushS.push(stRemote(l)); }
     });
+    // 补传本地有而云端没有的统计记录
+    for (const date in sMap) if (!remoteSeenS.has(date)) pushS.push(stRemote(sMap[date]));
     for (const date in sMap) await put('stats', sMap[date]);
 
     // 设置合并（learnedIndex）
