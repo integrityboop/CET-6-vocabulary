@@ -551,6 +551,14 @@ async function computeLearnedIndex() {
   }
   return RAW_WORDS.length;
 }
+// 每天一个 List：检查 listIndex 这个 List 是否今天刚学完（全部词 learnedDate == 今天）
+async function listDoneToday(listIndex) {
+  if (listIndex < 0 || listIndex >= RAW_WORDS.length) return false;
+  const progs = await getAll('progress');
+  const map = {}; progs.forEach(p => { map[p.word] = p; });
+  const t = todayISO();
+  return RAW_WORDS[listIndex].words.every(w => { const p = map[w.word]; return !!p && p.learnedDate === t; });
+}
 // 今日待复习：stage>=1 且到期
 async function getReviewQueue() {
   const progs = await getAll('progress');
@@ -620,15 +628,25 @@ async function renderStudy() {
     newHTML = '<div class="home-card"><h3>🎉 全部 ' + RAW_WORDS.length + ' 个 List 已学完</h3><p class="sub">太棒了！记得坚持复习巩固哦</p></div>';
   } else {
     const list = RAW_WORDS[learnedIdx];
-    newHTML =
-      '<div class="home-card">' +
-        '<div class="home-card-head"><h3>📖 今日新词 · List ' + (learnedIdx + 1) + '</h3></div>' +
-        '<p class="sub">' + list.words.length + ' 个单词 · 浏览 → 英选中测验 → 晋级</p>' +
-        '<div class="chips">' + list.words.map(w => '<span class="chip">' + esc(w.word) + '</span>').join('') + '</div>' +
-        '<button class="btn primary" id="startNewBtn" ' + (hasReview ? 'disabled' : '') + '>' +
-          (hasReview ? '请先完成今日复习' : '开始学习 List ' + (learnedIdx + 1)) +
-        '</button>' +
-      '</div>';
+    const locked = learnedIdx > 0 && await listDoneToday(learnedIdx - 1);
+    if (locked) {
+      newHTML =
+        '<div class="home-card">' +
+          '<div class="home-card-head"><h3>✅ 今日 List ' + learnedIdx + ' 已完成</h3></div>' +
+          '<p class="sub">每天一个 List —— 明天开始 List ' + (learnedIdx + 1) + '，今天先复习巩固</p>' +
+          '<button class="btn primary" disabled>明日解锁</button>' +
+        '</div>';
+    } else {
+      newHTML =
+        '<div class="home-card">' +
+          '<div class="home-card-head"><h3>📖 今日新词 · List ' + (learnedIdx + 1) + '</h3></div>' +
+          '<p class="sub">' + list.words.length + ' 个单词 · 浏览 → 英选中测验 → 晋级</p>' +
+          '<div class="chips">' + list.words.map(w => '<span class="chip">' + esc(w.word) + '</span>').join('') + '</div>' +
+          '<button class="btn primary" id="startNewBtn" ' + (hasReview ? 'disabled' : '') + '>' +
+            (hasReview ? '请先完成今日复习' : '开始学习 List ' + (learnedIdx + 1)) +
+          '</button>' +
+        '</div>';
+    }
   }
 
   el.innerHTML =
@@ -650,6 +668,7 @@ async function startNewSession() {
   if (reviewQ.length) { toast('请先完成今日复习'); return; }
   const idx = await computeLearnedIndex();
   if (idx >= RAW_WORDS.length) { toast('全部 List 已学完'); return; }
+  if (idx > 0 && await listDoneToday(idx - 1)) { toast('今日 List 已完成，明天再学下一个'); return; }
 
   const today = todayISO();
   const queue = [];
