@@ -152,7 +152,8 @@ body{
 .ck-week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:12px 0 6px}
 .ck-week span{text-align:center;font-size:12px;color:#8E8E93}
 .ck-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.ck-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:13px;border-radius:8px;background:#F2F2F7;color:#3C3C43}
+.ck-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:13px;line-height:1.15;border-radius:8px;background:#F2F2F7;color:#3C3C43}
+.ck-l{font-size:8px;font-weight:700;margin-top:1px;opacity:.72;line-height:1.1}
 .ck-today{outline:2px solid #007AFF;outline-offset:-2px;background:#fff}
 .ck-on{background:rgba(0,122,255,.85);color:#fff;font-weight:700}
 .ck-future{background:transparent;color:#D1D1D6}
@@ -992,6 +993,9 @@ async function renderStats() {
   const progs = await getAll('progress');
   const stats = await getAll('stats');
   const map = {}; stats.forEach(s => { map[s.date] = s.total || 0; });
+  const wordList = {}; RAW_WORDS.forEach((lst, i) => lst.words.forEach(w => { wordList[w.word] = i + 1; }));
+  const dateLists = {};
+  progs.forEach(p => { if (p.learnedDate) { const l = wordList[p.word]; if (l) { (dateLists[p.learnedDate] = dateLists[p.learnedDate] || []).push(l); } } });
   const learned = progs.filter(p => p.stage >= 1).length;
   const mastered = progs.filter(p => p.stage >= 6).length;
   const fav = progs.filter(p => p.favorite).length;
@@ -1014,7 +1018,7 @@ async function renderStats() {
         '<div class="stat-cell"><b>' + streak + '</b><span>当前连续</span></div>' +
       '</div>' +
       '<div id="checkinGrid"></div>' +
-      '<div class="home-tip">完成一次学习即自动打卡</div>' +
+      '<div class="home-tip">完成一次学习即自动打卡 · 当天所学 List 会标在日期上</div>' +
     '</div>' +
     '<div class="home-card">' +
       '<h3>🔥 近 90 天学习热力图</h3>' +
@@ -1027,7 +1031,7 @@ async function renderStats() {
       '<div class="curve-legend"><span class="lg lg-theo"></span>理论艾宾浩斯<span class="lg lg-act"></span>实际记忆保留率</div>' +
     '</div>';
   renderHeatmap(el, map);
-  renderCheckinGrid(el, map);
+  renderCheckinGrid(el, map, dateLists);
   drawCurve(el);
 }
 
@@ -1052,7 +1056,7 @@ function calcCheckin(map) {
   return { month, total };
 }
 
-function renderCheckinGrid(el, map) {
+function renderCheckinGrid(el, map, dateLists) {
   const box = el.querySelector('#checkinGrid');
   if (!box) return;
   const now = new Date();
@@ -1071,7 +1075,9 @@ function renderCheckinGrid(el, map) {
     if (future) cls += ' ck-future';
     else if (n > 0) cls += ' ck-on';
     if (iso === today) cls += ' ck-today';
-    html += '<div class="' + cls + '" title="' + iso + (n ? '：打卡 ' + n + ' 词' : '') + '">' + d + '</div>';
+    const lists = (dateLists && dateLists[iso]) ? [...new Set(dateLists[iso])] : [];
+    const tag = lists.length ? '<span class="ck-l">' + lists.map(x => 'L' + x).join(',') + '</span>' : '';
+    html += '<div class="' + cls + '" title="' + iso + (lists.length ? ' 学 List ' + lists.join(',') : '') + (n ? ' · 打卡 ' + n + ' 词' : '') + '">' + d + tag + '</div>';
   }
   html += '</div>';
   box.innerHTML = html;
