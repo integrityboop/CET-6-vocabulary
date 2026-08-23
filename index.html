@@ -2137,11 +2137,11 @@ function stLocal(r) {
   return { date: r.date, newCount: r.new_count, reviewCount: r.review_count, correct: r.correct, total: r.total, updatedAt: r.updated_at || 0 };
 }
 
-async function syncNow() {
+async function syncNow(silent) {
   const el = document.getElementById('syncStatus');
   const url = ((await getSetting('supabaseUrl')) || '').trim();
   const key = ((await getSetting('supabaseKey')) || '').trim();
-  if (!url || !key) { if (el) el.textContent = '请先填写并保存 Supabase URL 与 Anon Key'; toast('请先保存配置'); return; }
+  if (!url || !key) { if (el) el.textContent = '请先填写并保存 Supabase URL 与 Anon Key'; if (!silent) toast('请先保存配置'); return; }
   if (el) el.textContent = '同步中…';
   const headers = { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' };
 
@@ -2206,21 +2206,23 @@ async function syncNow() {
 
     await setSetting('lastSyncAt', Date.now());
     if (el) el.textContent = '同步完成 ✅ ' + new Date().toLocaleTimeString();
-    toast('云同步完成');
+    if (!silent) toast('云同步完成');
     refreshAll();
   } catch (e) {
     if (el) el.textContent = '同步失败：' + e.message;
-    toast('同步失败');
+    if (!silent) toast('同步失败');
   }
 }
 
-/* 自动同步：背完 / 复习完一轮后自动调用，无需手动点同步按钮。
-   还没配置 Supabase 时静默跳过，不打扰使用。 */
-async function autoSync() {
+/* 自动同步：无需手动点同步按钮。
+   - 背完 / 复习完一轮后调用（silent=false，会提示"云同步完成"）
+   - 打开 App / 定时调用（silent=true，静默拉取，失败不打扰）
+   还没配置 Supabase 时静默跳过。 */
+async function autoSync(silent) {
   const url = ((await getSetting('supabaseUrl')) || '').trim();
   const key = ((await getSetting('supabaseKey')) || '').trim();
   if (!url || !key) return; // 未配置云同步，跳过
-  await syncNow();
+  await syncNow(silent);
 }
 
 /* =====================================================================
@@ -2248,6 +2250,10 @@ async function init() {
   renderFav();
   renderStats();
   renderMine();
+  // 自动云同步：打开 App 后静默拉取云端最新进度；此后每 60 秒静默同步一次，
+  // 手机 / 电脑任一端背完都会自动同步到另一端，无需手动点"立即同步"。
+  setTimeout(() => { if (!document.hidden) autoSync(true); }, 2000);
+  setInterval(() => { if (!document.hidden) autoSync(true); }, 60000);
 }
 init();
 </script>
