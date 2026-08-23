@@ -1703,6 +1703,7 @@ async function finishNew() {
     '</div>' +
     '<button class="btn primary" id="doneBtn">返回首页</button>';
   document.getElementById('doneBtn').addEventListener('click', closeSession);
+  autoSync(); // 背完本 List 后自动同步到云端（手机/电脑进度保持一致）
 }
 
 /* =====================================================================
@@ -1821,6 +1822,7 @@ async function finishReview() {
     '</div>' +
     '<button class="btn primary" id="doneBtn">返回首页</button>';
   document.getElementById('doneBtn').addEventListener('click', closeSession);
+  autoSync(); // 复习完后自动同步到云端（手机/电脑进度保持一致）
 }
 
 /* =====================================================================
@@ -2139,8 +2141,8 @@ async function syncNow() {
   const el = document.getElementById('syncStatus');
   const url = ((await getSetting('supabaseUrl')) || '').trim();
   const key = ((await getSetting('supabaseKey')) || '').trim();
-  if (!url || !key) { el.textContent = '请先填写并保存 Supabase URL 与 Anon Key'; toast('请先保存配置'); return; }
-  el.textContent = '同步中…';
+  if (!url || !key) { if (el) el.textContent = '请先填写并保存 Supabase URL 与 Anon Key'; toast('请先保存配置'); return; }
+  if (el) el.textContent = '同步中…';
   const headers = { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' };
 
   try {
@@ -2203,13 +2205,22 @@ async function syncNow() {
     });
 
     await setSetting('lastSyncAt', Date.now());
-    el.textContent = '同步完成 ✅ ' + new Date().toLocaleTimeString();
+    if (el) el.textContent = '同步完成 ✅ ' + new Date().toLocaleTimeString();
     toast('云同步完成');
     refreshAll();
   } catch (e) {
-    el.textContent = '同步失败：' + e.message;
+    if (el) el.textContent = '同步失败：' + e.message;
     toast('同步失败');
   }
+}
+
+/* 自动同步：背完 / 复习完一轮后自动调用，无需手动点同步按钮。
+   还没配置 Supabase 时静默跳过，不打扰使用。 */
+async function autoSync() {
+  const url = ((await getSetting('supabaseUrl')) || '').trim();
+  const key = ((await getSetting('supabaseKey')) || '').trim();
+  if (!url || !key) return; // 未配置云同步，跳过
+  await syncNow();
 }
 
 /* =====================================================================
