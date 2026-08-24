@@ -99,7 +99,7 @@ body{
 #sessionBody .btn{margin-top:14px}
 
 /* 测验 */
-.quiz-head{text-align:center;margin:30px 0 26px}
+.quiz-head{position:relative;text-align:center;margin:30px 0 26px}
 .options{flex:1;display:flex;flex-direction:column;justify-content:center}
 .opt{
   display:block;width:100%;min-height:56px;margin:10px 0;padding:15px 16px;
@@ -133,6 +133,15 @@ body{
   flex-shrink:0;margin-left:10px;height:34px;padding:0 14px;border-radius:17px;
   border:none;background:#FFEBEA;color:#FF3B30;font-size:13px;font-weight:600;cursor:pointer;
 }
+/* 收藏页：按 List 分组折叠 */
+.fav-group{background:#fff;border-radius:20px;box-shadow:0 4px 12px rgba(0,0,0,.05);margin-bottom:14px;overflow:hidden}
+.fav-group-head{display:flex;align-items:center;gap:10px;padding:16px;cursor:pointer;user-select:none;-webkit-user-select:none}
+.fav-group-head b{font-size:17px;flex-shrink:0}
+.fav-group-arrow{margin-left:auto;color:#C7C7CC;font-size:15px;transition:transform .2s}
+.fav-group-body{padding:0 16px 16px}
+.fav-group-body .fav-item{background:transparent;border-radius:0;box-shadow:none;padding:14px 0;margin:0;border-bottom:.5px solid #E5E5EA}
+.fav-group-body .fav-item:last-child{border-bottom:none}
+.list-tag{display:inline-block;background:rgba(0,122,255,.1);color:#007AFF;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:2px}
 
 /* ===================== 统计页 ===================== */
 .stat-grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
@@ -182,6 +191,22 @@ body{
   z-index:200;pointer-events:none;white-space:nowrap;max-width:82vw;
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ===================== List 单词总览（学习页底部） ===================== */
+.ov-word{background:#F9F9F9;border-radius:14px;padding:12px 14px;margin:10px 0}
+.ov-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ov-head b{font-size:17px;flex-shrink:0}
+.ov-head .phonetic{display:inline;margin:0;font-size:14px}
+.ov-word .meaning{margin-top:6px;text-align:left;font-size:15px}
+.ov-word .example{margin-top:6px;text-align:left;font-size:13px;color:#636366;line-height:1.6}
+.ov-word .example::before{content:"• ";color:#C7C7CC}
+.unfam-btn{flex-shrink:0;margin-left:auto;height:30px;padding:0 12px;border-radius:15px;border:none;background:#FFEBEA;color:#FF3B30;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.unfam-btn.on{background:rgba(52,199,89,.15);color:#1E8E3E}
+.unfam-btn:active{opacity:.8}
+
+/* ===================== 测验：不熟悉按钮 ===================== */
+.unfam-pill{display:block;margin:12px auto 0;height:32px;padding:0 16px;border-radius:16px;border:none;background:#FFEBEA;color:#FF3B30;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.unfam-pill.on{background:rgba(52,199,89,.15);color:#1E8E3E}
 </style>
 </head>
 <body>
@@ -1293,6 +1318,1002 @@ const DATA_LISTS = [
 ];
 const RAW_WORDS = DATA_LISTS.map((words, i) => ({ list: i + 1, words: words.map(p => ({ word: p[0], meaning: p[1] })) }));
 
+const WORD_EXAMPLES = {
+  "descend": ["The hikers had to descend the steep mountain trail carefully.", "As darkness fell, the plane began to descend toward the airport."],
+  "accommodate": ["The new auditorium can accommodate over two thousand people.", "We must accommodate our teaching style to meet each student's needs."],
+  "primarily": ["The course is designed primarily for advanced English learners.", "His success is primarily due to years of patient practice."],
+  "suburb": ["They moved to a quiet suburb to escape the city noise.", "The suburb has grown rapidly since the new railway opened."],
+  "arrogant": ["His arrogant attitude made him unpopular with his colleagues.", "The arrogant manager refused to listen to any suggestions."],
+  "paradise": ["The tropical island looks like a paradise for holidaymakers.", "For bird lovers, the wetland reserve is a true paradise."],
+  "plea": ["Her plea for help was ignored by the passing crowd.", "The lawyer entered a plea of not guilty on behalf of his client."],
+  "flat": ["She rents a small flat near the university campus.", "The farmland here is flat, stretching all the way to the horizon."],
+  "ponder": ["He paused to ponder the consequences of his decision.", "The committee will ponder the proposal before voting."],
+  "ignite": ["A single spark can ignite a huge fire in dry forest.", "His inspiring speech ignited a wave of enthusiasm among the students."],
+  "decent": ["Everyone deserves a decent job with fair pay.", "She is a decent person who always keeps her promises."],
+  "recipe": ["This recipe calls for three eggs and a cup of flour.", "My grandmother's recipe for chicken soup is a family treasure."],
+  "spontaneous": ["The audience burst into spontaneous applause at the end.", "Their meeting was entirely spontaneous, not planned in advance."],
+  "severe": ["The region is suffering from a severe shortage of water.", "He received severe injuries in the car accident."],
+  "propel": ["The new engine can propel the boat at great speed.", "Her ambition propelled her to the top of the company."],
+  "authorize": ["The manager authorized the purchase of new equipment.", "Only the board can authorize such a large expenditure."],
+  "instruct": ["The teacher instructed the students to complete the assignment by Friday.", "Please instruct your staff to follow the safety regulations."],
+  "lure": ["The promise of high wages lured many workers to the city.", "The colorful advertisement is a lure for online shoppers."],
+  "genuine": ["The antique vase was later confirmed to be genuine.", "She showed genuine concern for the welfare of her students."],
+  "emergency": ["In an emergency, call this number immediately.", "The hospital keeps a team ready for any emergency."],
+  "consensus": ["The committee finally reached a consensus on the budget.", "There is a growing consensus that education must be reformed."],
+  "artery": ["The main artery carries oxygen-rich blood from the heart.", "This highway is the economic artery of the whole province."],
+  "splash": ["The stone hit the water with a loud splash.", "A splash of milk stained his clean shirt."],
+  "spoil": ["Grandparents often spoil their grandchildren with treats.", "The heavy rain threatened to spoil our picnic plans."],
+  "sponge": ["Use a damp sponge to wipe the table clean.", "The sponge soaked up all the spilled water."],
+  "hostile": ["The crowd grew hostile when the meeting was cancelled.", "Hostile weather conditions delayed the rescue mission."],
+  "chord": ["He struck a gentle chord on the guitar.", "The song's opening chord instantly captured the audience's attention."],
+  "feeble": ["The old man gave a feeble smile from his hospital bed.", "Their feeble excuse did not convince the angry manager."],
+  "spouse": ["Employees may bring their spouse to the annual dinner.", "A spouse can sometimes provide the best emotional support."],
+  "sparkle": ["The morning dew made the grass sparkle in the sunlight.", "Her eyes sparkle with excitement whenever she talks about art."],
+  "spark": ["A spark from the engine ignited the dry grass.", "The new policy sparked a heated debate among the public."],
+  "compliment": ["She received many compliments on her excellent presentation.", "He paid her a genuine compliment on her cooking."],
+  "complain": ["The guests complained about the poor service at the hotel.", "Don't complain about the weather; nothing can change it."],
+  "poverty": ["Millions of people still live in extreme poverty today.", "The scholarship helped him escape poverty through education."],
+  "overthrow": ["The rebels attempted to overthrow the government.", "The new evidence could overthrow the long-held theory."],
+  "withdraw": ["The army was forced to withdraw from the front line.", "She decided to withdraw her application for the position."],
+  "repression": ["Years of political repression silenced all public dissent.", "He suffered from emotional repression after the traumatic event."],
+  "abstract": ["Please read the abstract before the full article.", "The concept of justice is too abstract for young children."],
+  "ensue": ["A heated argument ensued after the meeting.", "Chaos ensued when the power suddenly went out."],
+  "cognitive": ["Chess improves children's cognitive abilities significantly.", "Aging often affects cognitive functions such as memory."],
+  "notion": ["The notion of time travel fascinates many scientists.", "He rejected the notion that money alone brings happiness."],
+  "lubricate": ["You should lubricate the machine parts regularly.", "A little oil will lubricate the squeaky hinge."],
+  "sprinkle": ["She likes to sprinkle sugar on her pancakes.", "Rain began to sprinkle on the dry fields."],
+  "acute": ["The patient was admitted with acute abdominal pain.", "There is an acute shortage of skilled nurses in rural hospitals."],
+  "spy": ["The spy was caught passing secrets to a foreign power.", "The novel tells the story of a double agent working as a spy."],
+  "pedestrian": ["The driver stopped to let the pedestrian cross the road.", "This busy street is dangerous for pedestrians during rush hour."],
+  "faculty": ["She has an amazing faculty for learning new languages.", "He retained a keen faculty for numbers well into old age."],
+  "clutch": ["She pressed the clutch and changed into a lower gear.", "The child clutched his mother's hand in the crowded market."],
+  "squad": ["A squad of firefighters arrived at the scene within minutes.", "The police squad surrounded the building quietly."],
+  "proficiency": ["The job requires a high level of proficiency in English.", "She demonstrated remarkable proficiency in computer programming."],
+  "sentiment": ["Public sentiment has shifted against the new tax policy.", "The movie expresses deep sentimental feelings about family."],
+  "literacy": ["The government has launched a program to improve adult literacy.", "Literacy is essential for participating in modern society."],
+  "rectify": ["We must rectify the error before it causes more damage.", "The company took immediate action to rectify the safety problem."],
+  "overhead": ["The airline has reduced its overhead by cutting office costs.", "An overhead fan slowly turned in the quiet room."],
+  "destiny": ["She believed it was her destiny to become a doctor.", "Some people prefer to take control of their own destiny."],
+  "cellar": ["The old wine cellar is kept cool all year round.", "They stored vegetables in the cellar during the winter."],
+  "gigantic": ["A gigantic wave crashed against the lighthouse.", "The company suffered a gigantic financial loss last year."],
+  "reclaim": ["The government plans to reclaim land from the sea.", "He went to the office to reclaim his lost passport."],
+  "huddle": ["The children huddled together for warmth by the fire.", "The players huddled to discuss their final strategy."],
+  "hasty": ["Don't make a hasty decision that you might regret.", "A hasty conclusion often leads to serious mistakes."],
+  "batch": ["The bakery bakes a fresh batch of bread every morning.", "A new batch of students will arrive next week."],
+  "breed": ["This breed of dog is known for its loyalty.", "Mosquitoes breed rapidly in warm, wet conditions."],
+  "reconcile": ["It is hard to reconcile his words with his actions.", "The couple finally reconciled after a long separation."],
+  "fracture": ["The doctor said the fracture would take months to heal.", "A sharp blow can fracture the fragile glass."],
+  "contest": ["She won first prize in the writing contest.", "The two candidates are locked in a tight contest."],
+  "rivalry": ["There is a long-standing rivalry between the two football clubs.", "Sibling rivalry is common in many families."],
+  "context": ["You must consider the word in its full context.", "The quotation was taken out of context and misused."],
+  "deviate": ["The pilot refused to deviate from the planned route.", "He rarely deviates from his daily routine."],
+  "pamphlet、booklet": ["The hospital distributes a pamphlet about healthy eating.", "She picked up a pamphlet advertising the local festival."],
+  "discriminate": ["It is illegal to discriminate against workers on the basis of age.", "Babies can discriminate between different facial expressions."],
+  "competence": ["The manager praised her technical competence and reliability.", "He has proven his competence in handling difficult projects."],
+  "barricade": ["The protesters set up a barricade across the main road.", "Police removed the barricade after the demonstration ended."],
+  "glamor": ["Many young people are drawn to the glamor of city life.", "The film captured the glamor of 1950s Hollywood."],
+  "mourish": ["A healthy diet helps mourish both body and mind.", "Good books can mourish a child's imagination."],
+  "armor": ["The knight wore heavy armor into battle.", "Modern armor can protect vehicles from gunfire."],
+  "enlighten": ["Could you enlighten me about the new procedure?", "His lecture enlightened the students on modern art."],
+  "progressive": ["The disease causes progressive loss of vision.", "She holds progressive views on education reform."],
+  "booth": ["He bought a ticket from the booth at the station.", "The voting booth was set up in the school hall."],
+  "appendix": ["He was rushed to hospital with an inflamed appendix.", "Full details are given in the appendix of the report."],
+  "accordance": ["The plan was carried out in accordance with the regulations.", "The goods must be shipped in accordance with the contract terms."],
+  "groove": ["The needle follows the groove on the record.", "Water flowed along a narrow groove in the rock."],
+  "propaganda": ["The regime used propaganda to control public opinion.", "Wartime propaganda often distorts the truth."],
+  "flare": ["The sailors fired a flare to signal for help.", "The rescue team launched a flare into the dark sky."],
+  "innumerable": ["Innumerable stars filled the clear night sky.", "The charity has helped innumerable families over the years."],
+  "justify": ["Nothing can justify such cruel behavior.", "How can you justify spending so much money on one shirt?"],
+  "foam": ["The waves left white foam on the sand.", "He added foam to the coffee to make it look fancy."],
+  "intellectual": ["Chess is an intellectual game that tests strategy.", "The university is a center of intellectual activity."],
+  "objection": ["The committee raised several objections to the plan.", "She had no objection to working on weekends."],
+  "costume": ["The actors wore traditional costumes for the play.", "The children made their own Halloween costumes."],
+  "hurricane": ["The hurricane destroyed hundreds of homes along the coast.", "Forecasters warned that the hurricane would strike at midnight."],
+  "entail": ["The new project will entail a lot of extra work.", "Accepting this job entails moving to another city."],
+  "trigger": ["He kept his finger off the trigger until the target appeared.", "The storm triggered widespread flooding in the lowlands."],
+  "foremost": ["She is the foremost expert in her field.", "Safety is the foremost concern of the engineering team."],
+  "stack": ["A tall stack of books sat on his desk.", "She stacked the plates neatly in the cupboard."],
+  "circus": ["The children were thrilled to see the circus come to town.", "The circus performers amazed the audience with their skills."],
+  "stagger": ["He gave a stagger and nearly fell on the stairs.", "The man staggered out of the pub, clearly drunk."],
+  "recognize": ["I didn't recognize him with his new haircut.", "The company recognized her contribution with an award."],
+  "staircase": ["The marble staircase led up to the grand hall.", "She ran down the staircase two steps at a time."],
+  "embody": ["The flag is meant to embody the nation's core values.", "This building seems to embody the spirit of modern architecture."],
+  "detach": ["You can detach the handle for easy cleaning.", "The soldier was ordered to detach from the main unit."],
+  "rejoice": ["The whole town rejoiced at the news of peace.", "She rejoiced in her daughter's success."],
+  "hierarchy": ["He climbed the corporate hierarchy step by step.", "There is a strict hierarchy within the army."],
+  "probe": ["The doctor used a probe to examine the wound.", "Scientists launched a probe to study the distant planet."],
+  "essence": ["The essence of the argument is quite simple.", "She captured the essence of the culture in her photographs."],
+  "ego": ["His huge ego made it hard to work with him.", "The praise boosted her ego after the difficult year."],
+  "conscientious": ["She is a conscientious worker who checks every detail.", "A conscientious student always completes homework on time."],
+  "reinforce": ["The teacher reinforced the lesson with practical examples.", "Extra steel was added to reinforce the bridge."],
+  "caption": ["The video was captioned for deaf viewers.", "She wrote a witty caption for the photo."],
+  "allowance": ["The company gives a monthly allowance for transport.", "Children should learn to manage their weekly allowance."],
+  "stalk": ["A photographer was accused of stalking the actress.", "The hunter stalked the deer through the tall grass."],
+  "paste": ["Mix the flour with water to form a thick paste.", "He pasted the photo onto the page of his album."],
+  "endow": ["The millionaire endowed the university with a large sum.", "She is endowed with remarkable musical talent."],
+  "trumpet": ["He plays the trumpet in the school band.", "The company trumpeted its new product across all media."],
+  "narrative": ["The novel has a complex narrative structure.", "Her narrative of the journey kept everyone entertained."],
+  "rot": ["The fruit was left to rot in the hot sun.", "Damp conditions cause wood to rot quickly."],
+  "spice": ["Add some spice to give the dish more flavor.", "Variety is the spice of life, as the saying goes."],
+  "institution": ["The bank is a respected financial institution.", "Marriage is an ancient institution in many cultures."],
+  "grim": ["The news from the front was grim and discouraging.", "He wore a grim expression throughout the meeting."],
+  "stern": ["The teacher gave the class a stern warning.", "She received a stern look from her father."],
+  "mud": ["The children came home covered in mud after the rain.", "The car got stuck in the deep mud on the farm road."],
+  "stall": ["She bought fresh fruit from the market stall.", "The engine stalled at the traffic lights."],
+  "prone": ["People who sit all day are prone to back problems.", "The region is prone to earthquakes."],
+  "staple": ["He removed the staples from the document with care.", "Rice is a staple food in many Asian countries."],
+  "startle": ["The sudden noise startled the sleeping cat.", "She was startled by the unexpected knock at the door."],
+  "stateman": ["The veteran stateman was respected by leaders worldwide.", "As a stateman, he dedicated his life to peace."],
+  "eloquent": ["She gave an eloquent speech that moved the audience.", "His eloquent writing won him many readers."],
+  "stationary": ["The bus remained stationary in the heavy traffic.", "A stationary target is much easier to hit."],
+  "appease": ["The government tried to appease the angry protesters.", "He offered a compromise to appease both sides."],
+  "stereo": ["The concert was broadcast in stereo sound.", "She turned up the stereo system to full volume."],
+  "stereotype": ["The film challenges the stereotype of the scientist.", "It is wrong to judge people by cultural stereotypes."],
+  "consult": ["You should consult a doctor about that persistent cough.", "The manager consulted her team before making the final decision."],
+  "insult": ["He felt insulted by the rude remark.", "Don't insult your colleagues, even in a heated argument."],
+  "census": ["The census is conducted every ten years in this country.", "Census data helps the government plan public services."],
+  "giggle": ["The children giggled at the clown's funny tricks.", "She tried to hide a giggle during the serious lecture."],
+  "glitter": ["The glitter of the diamond caught everyone's eye.", "All that glitters is not gold, as the proverb says."],
+  "lieutenant": ["The lieutenant ordered his men to advance.", "She was promoted to lieutenant after five years of service."],
+  "adore": ["The fans adore the young singer's every performance.", "She adores her grandmother and visits her every week."],
+  "prospective": ["The university interviews prospective students every spring.", "They showed the house to several prospective buyers."],
+  "preclude": ["A lack of funds precluded any further research.", "His injury precluded him from taking part in the race."],
+  "sticky": ["The sticky candy stuck to my fingers.", "The manager had to deal with a sticky situation at work."],
+  "marsh": ["Herons live among the reeds of the marsh.", "The marsh was drained to create farmland."],
+  "patron": ["The wealthy patron donated funds for the new gallery.", "She is a regular patron of the local bookshop."],
+  "arch": ["The ancient stone arch still stands over the river.", "They walked through the arch into the courtyard."],
+  "baffle": ["The mystery of the missing painting baffled the police.", "His strange behavior baffles all of his friends."],
+  "bald": ["The bald statement contained no apology at all.", "He started going bald in his early thirties."],
+  "emigrate": ["Her family decided to emigrate to Canada for a better life.", "Many people emigrate from their homeland in search of work."],
+  "immigrant": ["The city has a large population of immigrants from Asia.", "Every immigrant brings a unique story and culture."],
+  "dub": ["Critics dub him the finest young director of his generation.", "Some fans dub the series a modern classic."],
+  "dazzle": ["Her performance is sure to dazzle the audience tonight.", "The lights of the city never fail to dazzle visitors."],
+  "heel": ["She felt a sharp pain in her right heel after the run.", "Procrastination is his Achilles' heel at work."],
+  "dispatch": ["The manager will dispatch a courier with the documents.", "They plan to dispatch a rescue team at dawn."],
+  "flutter": ["Butterflies flutter gracefully among the wild flowers.", "Her heart began to flutter with nervous excitement."],
+  "rash": ["A red rash appeared on his arms after the allergy test.", "Quitting without a plan was a rash and foolish decision."],
+  "stitch": ["The surgeon used a single stitch to close the wound.", "She plans to stitch a small flower onto the cushion."],
+  "straightforward": ["He gave a straightforward answer to the tricky question.", "The instructions are straightforward and easy to follow."],
+  "bargain": ["She managed to bargain the price down to thirty dollars.", "This vintage watch was a genuine bargain at the sale."],
+  "aspiration": ["Her lifelong aspiration is to become a heart surgeon.", "The young writer spoke about his aspiration to publish a novel."],
+  "drawback": ["The main drawback of this house is its tiny kitchen.", "One serious drawback is the lack of public transport."],
+  "tool": ["A good education is a powerful tool for upward mobility.", "He keeps every tool in the workshop neatly organized."],
+  "correlate": ["Sleep quality appears to correlate closely with memory.", "Incomes often correlate strongly with health outcomes."],
+  "sip": ["She took a small sip of the steaming hot tea.", "He paused to sip his coffee before answering."],
+  "conservation": ["Wildlife conservation has become a global priority.", "Energy conservation helps reduce both cost and waste."],
+  "clasp": ["She will clasp her hands tightly when she is nervous.", "Children often clasp their parents' hands in a crowd."],
+  "invert": ["To drain the bottle, simply invert it over the sink.", "The camera lens will invert the image on the sensor."],
+  "segment": ["The documentary devoted a segment to ocean pollution.", "A large segment of voters supports the new policy."],
+  "drain": ["Leaves have blocked the drain and flooded the courtyard.", "Constant travel can be a serious drain on your energy."],
+  "entrepreneur": ["The young entrepreneur launched her own tech startup.", "A successful entrepreneur must accept calculated risks."],
+  "enterprise": ["His enterprise grew into a large international company.", "The joint enterprise involved partners from three nations."],
+  "assault": ["The soldiers launched a fierce assault before dawn.", "The report was an assault on the company's reputation."],
+  "concise": ["The professor demanded concise answers from every student.", "Keep your summary concise and to the point."],
+  "denounce": ["The leaders will denounce the attack at the summit.", "Citizens gathered to denounce the government's decision."],
+  "condemn": ["The international community will condemn such violence.", "We condemn all forms of discrimination without exception."],
+  "streak": ["The team is currently on a winning streak.", "He has a stubborn streak that often causes conflict."],
+  "stream": ["A clear stream runs through the mountain valley.", "A steady stream of visitors entered the museum all day."],
+  "string": ["She tied the parcel with a piece of string.", "A string of failures made him reconsider his strategy."],
+  "preliminary": ["The preliminary results suggest the new treatment is effective.", "The two sides held preliminary talks before the summit."],
+  "streamline": ["The manager aims to streamline the entire approval process.", "New software can streamline customer service operations."],
+  "maneuver": ["The general planned a risky maneuver to encircle the enemy.", "Her clever maneuver won the negotiation for the company."],
+  "alleviate": ["The medicine may alleviate some of the chronic pain.", "Charities aim to alleviate poverty in rural regions."],
+  "physiological": ["Lack of sleep causes serious physiological changes.", "The study measured physiological responses to extreme stress."],
+  "psychological": ["The accident left deep psychological scars on the child.", "Various psychological factors often influence physical health."],
+  "physical": ["Regular physical exercise strengthens the heart.", "Certain physical symptoms sometimes reveal emotional stress."],
+  "stride": ["He will stride confidently into the interview room.", "The country took a major stride forward in education."],
+  "appara": ["The laboratory appara must be calibrated before each trial.", "Every piece of appara in the workshop is inspected daily."],
+  "rival": ["Her closest rival won the election by a narrow margin.", "Their main rival in Asia announced a new product today."],
+  "deduce": ["From the footprints, we can deduce that someone entered.", "Detectives deduce the truth from the smallest clues."],
+  "critic": ["The film critic praised the director's bold vision.", "Every critic of the plan questions its long-term benefits."],
+  "levy": ["The government plans to levy a tax on imported cars.", "The council imposed a new levy on plastic packaging."],
+  "disposition": ["She has a cheerful disposition that lifts the whole team.", "The general ordered the disposition of troops along the river."],
+  "scheme": ["The government launched a scheme to support young jobseekers.", "His secret scheme to defraud investors was soon discovered."],
+  "exhaust": ["The long climb can exhaust even experienced hikers.", "Endless meetings exhaust the patience of every employee."],
+  "eligible": ["Only citizens over eighteen are eligible to vote.", "She is eligible for the scholarship because of her grades."],
+  "intellect": ["His sharp intellect impressed everyone at the debate.", "She combines powerful intellect with practical common sense."],
+  "clan": ["The clan gathered every year for a grand family reunion.", "Loyalty to the clan often comes before personal ambition."],
+  "expedition": ["The expedition to the Arctic lasted nearly three months.", "They prepared carefully for their expedition into the jungle."],
+  "polish": ["She will polish her essay before submitting it tomorrow.", "He likes to polish his shoes before every important meeting."],
+  "applaud": ["The audience stood up to applaud the young pianist.", "We applaud their efforts to protect the environment."],
+  "discreet": ["He was discreet about his colleague's personal problems.", "Please remain discreet; the details are highly sensitive."],
+  "grope": ["She had to grope for the light switch in the dark.", "The committee continued to grope for a practical solution."],
+  "counterpart": ["The foreign minister met his Chinese counterpart in Beijing.", "Our company's British counterpart reported similar losses."],
+  "ascertain": ["The police tried to ascertain the cause of the accident.", "We must ascertain the facts before we make a decision."],
+  "spite": ["He broke the vase out of pure spite.", "She refused to help him simply to spite his rival."],
+  "crew": ["The flight crew remained calm during the turbulence.", "A rescue crew was sent to the sinking ship."],
+  "crow": ["A black crow perched on the fence and called loudly.", "The clever crow used a stick to reach the food."],
+  "pedal": ["He pressed the brake pedal to slow the car.", "Keep your foot on the pedal until you pass the corner."],
+  "invaluable": ["Her advice proved invaluable during the financial crisis.", "The old manuscripts are invaluable to modern historians."],
+  "unvalued": ["His hard work went unvalued and largely ignored.", "They felt their contributions were unvalued by the company."],
+  "audience": ["The comedian kept the audience laughing all evening.", "The book appeals to a broad audience of curious readers."],
+  "chronic": ["He has suffered from chronic back pain for years.", "Long-term chronic unemployment has devastated the local economy."],
+  "soar": ["House prices continue to soar in major cities.", "The eagle began to soar high above the mountains."],
+  "elaborate": ["They prepared an elaborate feast for the royal guests.", "Could you elaborate on that point for the committee?"],
+  "retrospect": ["In retrospect, I should have accepted the offer.", "The plan seems far too risky in retrospect."],
+  "strive": ["She will strive to balance work and family life.", "The company must strive for excellence in every product."],
+  "cathedral": ["The cathedral towers dominate the city's skyline.", "Tourists lined up to admire the ancient cathedral."],
+  "stroke": ["She reached out to stroke the cat's soft fur.", "Remember to stroke the dog gently behind its ears."],
+  "likelihood": ["There is a high likelihood of rain this afternoon.", "The likelihood of success depends on careful planning."],
+  "stroll": ["They took a leisurely stroll along the riverbank.", "We often stroll through the old town after dinner."],
+  "discern": ["It is hard to discern the meaning of the blurred text.", "Analysts can discern a clear pattern in the data."],
+  "stubborn": ["He is too stubborn to admit he made a mistake.", "The stubborn stain refused to come out of the shirt."],
+  "beam": ["A heavy wooden beam supports the old barn ceiling.", "Sunlight seemed to beam through the dusty window."],
+  "axis": ["The Earth rotates on its axis once every twenty-four hours.", "The old city developed along the axis of the river."],
+  "lane": ["Slow traffic must stay in the right-hand lane.", "A narrow lane leads from the village to the church."],
+  "mercury": ["The element mercury is a liquid at room temperature.", "The old thermometer still contains a small amount of mercury."],
+  "incline": ["The car struggled to climb the steep incline.", "A gentle incline leads up to the hilltop temple."],
+  "stumble": ["He tried not to stumble on the rocky path.", "Many students stumble when they face a difficult question."],
+  "stump": ["The gardener dug the old tree stump out of the ground.", "This difficult puzzle will stump even the smartest student."],
+  "feasible": ["The engineers consider the plan technically feasible.", "Is it feasible to finish the entire project before May?"],
+  "definitive": ["The study provided definitive evidence of the link.", "Her book remains the definitive account of the war."],
+  "solicitor": ["She consulted a solicitor about the inheritance dispute.", "The solicitor drew up the contract for both parties."],
+  "outrage": ["The unfair ruling is certain to outrage local residents.", "The decision caused widespread public outrage."],
+  "stun": ["The sudden news is bound to stun the entire team.", "Such a brilliant performance can stun even the toughest judges."],
+  "sturdy": ["She packed the heavy books in a sturdy cardboard box.", "The sturdy bridge survived the worst storm in years."],
+  "escort": ["Armed guards will escort the ambassador to the airport.", "He offered to escort his grandmother to the front row."],
+  "contend": ["Three strong teams will contend for the championship.", "The lawyer will contend that the evidence is unreliable."],
+  "leather": ["The jacket is made of genuine Italian leather.", "He polished the leather boots until they shone."],
+  "commentary": ["The professor wrote a commentary on the new law.", "Her live commentary made the match exciting to watch."],
+  "consequent": ["The heavy rain and consequent flooding damaged the crops.", "The scandal and consequent resignations shocked the nation."],
+  "intimate": ["He did not openly intimate his true intentions.", "They have remained intimate friends for over a decade."],
+  "plead": ["The lawyer will plead her client's case before the jury.", "He decided to plead with the manager for an extension."],
+  "imperial": ["The imperial palace attracts millions of tourists each year.", "Historians study the daily life of the imperial court."],
+  "elite": ["The country's political elite gathered for the summit.", "Only the academic elite were admitted to the program."],
+  "intricate": ["The watch contains an intricate mechanism inside its case.", "They admired the intricate patterns on the ancient carpet."],
+  "submarine": ["The submarine silently patrolled the deep ocean.", "A nuclear submarine can remain submerged for months."],
+  "setback": ["The team suffered a serious setback when their captain resigned.", "Despite this setback, the researchers continued their work."],
+  "bureaucracy": ["Excessive bureaucracy delayed the construction permit for months.", "The local bureaucracy made even simple tasks difficult."],
+  "slash": ["The company decided to slash prices during the sale.", "He used the knife to slash through the thick rope."],
+  "reassure": ["The doctor tried to reassure her that everything was normal.", "His calm voice helped reassure the nervous passengers."],
+  "prosperous": ["The town grew prosperous because of its busy port.", "A prosperous economy depends on a skilled workforce."],
+  "submit": ["Please submit your report by Friday afternoon.", "He refused to submit to their unreasonable demands."],
+  "differentiate": ["It is hard to differentiate between the twin brothers.", "The brand tries to differentiate itself through better service."],
+  "quiver": ["Her lips began to quiver as she held back tears.", "A slight quiver in his voice revealed his anxiety."],
+  "bowel": ["The disease affects the lining of the bowel.", "He felt a sharp pain in his lower bowel."],
+  "subordinate": ["A good manager respects the views of subordinate staff.", "All other concerns are subordinate to safety."],
+  "consecutive": ["She won the title for three consecutive years.", "It rained for five consecutive days in July."],
+  "extinct": ["Dinosaurs became extinct millions of years ago.", "This volcano has been extinct for many centuries."],
+  "district": ["The company relocated its office to a commercial district.", "Each district in the city elects its own council member."],
+  "cork": ["She pulled the cork out of the wine bottle.", "The bulletin board is made of cork and fabric."],
+  "glare": ["The angry teacher will glare at any student who talks.", "The sudden glare of the headlights blinded the driver."],
+  "dictate": ["The manager would dictate letters to her assistant.", "Parents should not dictate every choice their children make."],
+  "creditor": ["Every major creditor demanded immediate repayment of the loan.", "The firm reached an agreement with each creditor last week."],
+  "prominent": ["She plays a prominent role in the research team.", "The tower remains a prominent landmark in the city."],
+  "insane": ["The court ruled that the defendant was legally insane.", "It seems insane to risk so much for so little."],
+  "magnificent": ["They admired the magnificent view from the mountain.", "The palace has magnificent ceilings painted by old masters."],
+  "magnitude": ["The government underestimated the magnitude of the disaster.", "An earthquake of magnitude eight struck the coastal region."],
+  "hostage": ["The gunman held four people hostage inside the bank.", "The kidnappers kept the businessman hostage for months."],
+  "flank": ["The general ordered an attack on the enemy's left flank.", "The pain in her flank turned out to be a kidney stone."],
+  "convene": ["The committee will convene next Tuesday to vote.", "The director decided to convene an emergency meeting."],
+  "affiliate": ["The local station plans to affiliate with a national network.", "The company opened an affiliate office in Shanghai."],
+  "subsidiary": ["The bank runs a subsidiary in every major city.", "The subsidiary division handles all international sales."],
+  "subsidy": ["The government provides a subsidy for solar energy.", "Many farmers depend on the subsidy to stay in business."],
+  "inertia": ["Bureaucratic inertia prevents meaningful reform in the agency.", "The truck continued forward by inertia after the engine stopped."],
+  "subsequent": ["The storm and subsequent floods destroyed the old bridge.", "The subsequent studies have confirmed the earlier findings."],
+  "slump": ["Oil prices continue to slump to new lows.", "Sales usually slump during the winter months."],
+  "skull": ["The archaeologist found a skull buried in the sand.", "He fractured his skull in the serious cycling accident."],
+  "implication": ["Every statement carries an implication that readers must notice.", "She did not grasp the implication of her careless remark."],
+  "cradle": ["The baby slept peacefully in its wooden cradle.", "Greece is often called the cradle of Western civilization."],
+  "fabric": ["The dress is made from a soft cotton fabric.", "The scandal threatened to tear the fabric of the community."],
+  "edible": ["These wild mushrooms are not edible.", "The dessert was decorated with delicate edible flowers."],
+  "collaboration": ["The discovery resulted from close collaboration between two laboratories.", "International collaboration is vital for climate research."],
+  "rim": ["He rested the cup on the rim of the saucer.", "Smoke rose from the rim of the active volcano."],
+  "indifferent": ["She seemed indifferent to the outcome of the match.", "The public has grown indifferent to repeated scandals."],
+  "confidential": ["This document is strictly confidential, so handle it carefully.", "The lawyer keeps all client information confidential."],
+  "administration": ["The university administration approved the new budget.", "The administration announced a major health reform plan."],
+  "instantaneous": ["The system provides instantaneous access to global news.", "With fiber optics, the message travels with almost instantaneous speed."],
+  "commodity": ["Coffee is a major export commodity for Brazil.", "In a market economy, almost everything becomes a commodity."],
+  "affection": ["She showed great affection for her younger brother.", "The dog wagged its tail with obvious affection."],
+  "comic": ["The comic actor made the entire audience laugh.", "His comic timing during the show was perfect."],
+  "subtract": ["If you subtract five from ten, you get five.", "Remember to subtract the costs before calculating profit."],
+  "restrain": ["The police had to restrain the angry crowd.", "She could not restrain her laughter during the meeting."],
+  "successive": ["The team won three successive championships in a row.", "Successive governments failed to solve the housing crisis."],
+  "successor": ["She was named as the successor to the retiring CEO.", "His successor inherited a company in financial trouble."],
+  "marginal": ["The new policy had only a marginal effect on unemployment.", "He won the election by a marginal number of votes."],
+  "margin": ["She wrote notes in the margin of her textbook.", "The company's profit margin has shrunk over the past year."],
+  "clerk": ["The clerk handed the customer her receipt and change.", "He worked as a clerk in a small law office."],
+  "rein": ["The rider had to rein in the horse before the fence.", "The government must rein in excessive public spending."],
+  "ozone": ["The ozone layer shields us from harmful ultraviolet rays.", "Scientists warn that the ozone hole is still a serious problem."],
+  "decay": ["Tooth decay can be prevented by brushing regularly.", "The old house fell into decay after years of neglect."],
+  "neglect": ["He continued to neglect his duties at work.", "Years of neglect had left the garden overgrown with weeds."],
+  "heap": ["She dumped the dirty clothes into a heap on the floor.", "There is a heap of work to finish before the deadline."],
+  "modest": ["Despite his success, he remained a modest and humble man.", "They live in a modest apartment near the city center."],
+  "modify": ["The engineer had to modify the design to reduce costs.", "You may need to modify your plans if the weather changes."],
+  "depict": ["The painting depicts a peaceful village in the countryside.", "The novel vividly depicts life in Victorian London."],
+  "convention": ["By convention, the bride wears a white dress at the wedding.", "Breaking with convention, she proposed to her boyfriend."],
+  "contempt": ["She looked at the dishonest salesman with obvious contempt.", "His contempt for the rules eventually got him fired."],
+  "condense": ["The author had to condense the novel into a short film script.", "Steam condenses into water when it touches a cold surface."],
+  "latitude": ["The birds fly south at this latitude to escape the cold.", "The manager allowed his staff considerable latitude in decision-making."],
+  "hawk": ["The hawk circled high above the field looking for prey.", "He is a political hawk who favors military intervention."],
+  "suffice": ["A short email will suffice for this simple request.", "One example should suffice to illustrate the point."],
+  "discard": ["Please discard the old files that are no longer needed.", "The chef discarded the wilted vegetables immediately."],
+  "plunge": ["The stock price took a sudden plunge after the announcement.", "He plunged into the freezing water to rescue the child."],
+  "explicit": ["The teacher gave explicit instructions on how to complete the task.", "The movie contains explicit scenes that are not suitable for children."],
+  "slick": ["The salesman's slick presentation convinced many customers.", "The roads were slick after the heavy rain."],
+  "prolong": ["The doctors tried to prolong his life with new treatment.", "We should not prolong this meeting unnecessarily."],
+  "quench": ["She drank a glass of water to quench her thirst.", "Nothing could quench the fire spreading through the dry forest."],
+  "lease": ["They signed a lease for the apartment downtown.", "The company decided to lease the equipment rather than buy it."],
+  "howl": ["The wind began to howl through the empty streets at night.", "The wolves howl at the moon during the winter."],
+  "banquet": ["The university held a grand banquet to honor its graduates.", "They served a lavish banquet with dishes from around the world."],
+  "divine": ["The villagers believed the rainfall was a divine blessing.", "She has a divine talent for playing the piano."],
+  "longevity": ["Regular exercise is linked to greater longevity.", "The secret of his longevity is a balanced diet and optimism."],
+  "immune": ["Once infected, the body becomes immune to the virus.", "The manager is immune to criticism from his staff."],
+  "precedent": ["This court ruling sets a precedent for future cases.", "There is no precedent for such a drastic policy change."],
+  "disorder": ["The library was in complete disorder after the storm.", "He suffers from a rare sleep disorder."],
+  "refrain": ["Please refrain from smoking in this public area.", "She could not refrain from laughing at his silly joke."],
+  "defeat": ["The army managed to defeat the invaders at last.", "He refused to accept defeat and tried again."],
+  "outward": ["Despite her outward calm, she was extremely nervous inside.", "The outward appearance of the building is modern and stylish."],
+  "activate": ["Press the red button to activate the alarm system.", "Exercise helps activate the muscles in your back."],
+  "summon": ["The president summoned his advisors for an urgent meeting.", "She summoned the courage to speak in front of the crowd."],
+  "aggravate": ["Heavy rain could aggravate the flood situation.", "Lifting weights may aggravate your injured shoulder."],
+  "designate": ["The committee will designate a new leader next week.", "This area has been designated as a wildlife reserve."],
+  "gorgeous": ["The garden looks gorgeous in the early morning light.", "She wore a gorgeous dress to the award ceremony."],
+  "proclaim": ["The government proclaimed the new law to the entire nation.", "He proudly proclaimed his innocence to the reporters."],
+  "handicap": ["His lack of experience was a serious handicap in the job.", "The school provides facilities for students with a physical handicap."],
+  "superficial": ["His knowledge of history is only superficial.", "The superficial wounds healed quickly without surgery."],
+  "paperback": ["The novel was so popular that it was soon released in paperback.", "I prefer a paperback because it is light to carry."],
+  "fascinate": ["Space exploration continues to fascinate people of all ages.", "She was fascinated by the intricate patterns of the ancient art."],
+  "accustomed": ["He is accustomed to getting up at six every morning.", "Her eyes quickly became accustomed to the dim light."],
+  "merit": ["The proposal merits serious consideration by the board.", "His excellent grades merit a full scholarship."],
+  "superintendent": ["The superintendent inspected the new building site this morning.", "The school superintendent announced a new curriculum."],
+  "manuscript": ["The author spent years revising her manuscript before publishing.", "He discovered an ancient manuscript in the library."],
+  "orthodox": ["The orthodox approach to teaching grammar is now being questioned.", "She holds orthodox views on religion and tradition."],
+  "regime": ["The new regime introduced sweeping economic reforms.", "Under the old regime, free speech was severely restricted."],
+  "negotiate": ["The two companies are trying to negotiate a new contract.", "It took months to negotiate a peace agreement."],
+  "superior": ["She always acts superior to her colleagues, which annoys them.", "He reported the problem to his superior immediately."],
+  "smuggle": ["The police caught him trying to smuggle cigarettes across the border.", "They smuggled valuable paintings out of the country."],
+  "supersonic": ["The supersonic jet broke the sound barrier in seconds.", "Concorde was one of the first supersonic passenger planes."],
+  "cape": ["She wrapped a red cape around her shoulders.", "The superhero wore a flowing cape in the movie."],
+  "latent": ["The disease can remain latent in the body for years.", "He has a latent talent for drawing that he never explored."],
+  "curb": ["The city introduced new taxes to curb traffic congestion.", "You should curb your anger and speak calmly."],
+  "notorious": ["The area is notorious for its high crime rate.", "He is a notorious gambler who owes huge debts."],
+  "shove": ["Someone shoved him from behind in the crowded train.", "She shoved the heavy box across the floor."],
+  "supplementary": ["Students can take supplementary courses to earn extra credits.", "He earns a supplementary income by tutoring on weekends."],
+  "brisk": ["A brisk walk every morning keeps him healthy.", "Business is brisk at the new cafe near the station."],
+  "stab": ["The attacker stabbed the victim in the arm.", "He felt a sharp stab of pain in his chest."],
+  "suppress": ["The government tried to suppress the protest quickly.", "She could not suppress a smile at his joke."],
+  "scrap": ["The mechanic picked up a scrap of metal from the floor.", "The company decided to scrap the old machinery."],
+  "radiant": ["The bride looked radiant in her white wedding dress.", "The radiant sun rose above the mountains."],
+  "sacred": ["The temple is considered a sacred place by the locals.", "He treated the promise as a sacred duty."],
+  "fort": ["The soldiers defended the fort against the enemy attack.", "The old fort overlooks the river valley."],
+  "interim": ["He served as the interim manager until a permanent one was found.", "In the interim, the students continued their research."],
+  "compromise": ["Both sides had to compromise to reach an agreement.", "His refusal to compromise ended the negotiations."],
+  "eclipse": ["A solar eclipse occurs when the moon covers the sun.", "The new star's success has eclipsed that of its rival."],
+  "dine": ["They love to dine at a quiet restaurant by the sea.", "We dined on fresh seafood during our holiday."],
+  "exclude": ["The price excludes taxes and delivery charges.", "Please exclude these names from the final list."],
+  "surgery": ["He underwent surgery on his knee last week.", "The surgeon performed a delicate surgery to save her sight."],
+  "gauge": ["The pressure gauge shows the tank is nearly empty.", "The survey is used to gauge public opinion on the issue."],
+  "outline": ["She outlined her research plan to the committee.", "The teacher asked us to outline the main events of the war."],
+  "junction": ["Turn left at the junction where the two roads meet.", "The accident happened at a busy junction downtown."],
+  "literal": ["The literal meaning of the word is quite different from its use.", "He took her remark in its literal sense and missed the joke."],
+  "surpass": ["Her performance in the exam surpassed all expectations.", "The new stadium will surpass the old one in size."],
+  "racket": ["The neighbors complained about the racket from the party.", "The children were making a terrible racket in the yard."],
+  "haul": ["The fishermen brought in a huge haul of fish.", "It was a long haul from the coast to the capital."],
+  "peculiar": ["The soup had a peculiar taste that I could not identify.", "It is peculiar that he left without saying goodbye."],
+  "console": ["She tried to console her friend after the sad news.", "He consoled himself with the thought that it was not his fault."],
+  "deficiency": ["A vitamin deficiency can cause serious health problems.", "The team's main deficiency is its weak defense."],
+  "gossip": ["She loves to gossip about her neighbors.", "The rumor was just idle gossip with no basis in fact."],
+  "susceptible": ["Children are especially susceptible to colds in winter.", "Young plants are susceptible to damage from frost."],
+  "sue": ["The company plans to sue the rival firm for stealing its design.", "She decided to sue the landlord over the unsafe apartment."],
+  "peg": ["He hung his coat on the peg by the door.", "She used a peg to mark the page of the book."],
+  "suspension": ["The driver received a suspension for driving too fast.", "The bridge is closed because of problems with its suspension system."],
+  "dart": ["He threw a dart and hit the center of the board.", "The boy made a sudden dart across the road."],
+  "imperative": ["It is imperative that we act before it is too late.", "Reducing emissions is an imperative for every nation."],
+  "oriental": ["She collected beautiful oriental carpets from the East.", "The museum has a fine collection of oriental art."],
+  "sanction": ["The government refused to sanction the new export deal.", "The UN imposed economic sanctions on the country."],
+  "notable": ["The conference attracted several notable scientists.", "Her work is notable for its originality and depth."],
+  "restraint": ["He showed great restraint by not shouting at the rude customer.", "The new rules place strict restraints on corporate spending."],
+  "fatigue": ["Mental fatigue can make it hard to concentrate.", "The driver fell asleep at the wheel due to fatigue."],
+  "impetus": ["The new law gave fresh impetus to the renewable energy industry.", "The discovery provided the impetus for further research."],
+  "suspicious": ["The police became suspicious of his strange behavior.", "She gave him a suspicious look and asked where he had been."],
+  "suspicion": ["He was arrested on suspicion of theft.", "There is a growing suspicion that the report is inaccurate."],
+  "opaque": ["The window is made of opaque glass to ensure privacy.", "His explanation was so opaque that nobody understood it."],
+  "safeguard": ["Laws were passed to safeguard the rights of workers.", "Wearing a helmet will safeguard you from serious injury."],
+  "juvenile": ["The court deals with juvenile offenders separately.", "His juvenile behavior embarrassed everyone at the meeting."],
+  "erect": ["The dog stood erect with its ears pointing forward.", "They plan to erect a monument in the town square."],
+  "subtle": ["There is a subtle difference between the two paintings.", "The manager hinted at the problem in a very subtle way."],
+  "majesty": ["We were struck by the majesty of the snow-covered mountains.", "The queen was addressed as 'Your Majesty'."],
+  "passive": ["He took a passive role in the group discussion.", "The passive voice is common in scientific writing."],
+  "grin": ["She gave him a wide grin when she saw the surprise.", "He grinned with delight as he unwrapped the gift."],
+  "elapse": ["Several months elapsed before he received a reply.", "A decade has elapsed since they last met."],
+  "reap": ["Farmers reap the wheat in late summer.", "Those who work hard will eventually reap the benefits."],
+  "sequence": ["The film shows the events in chronological sequence.", "A sequence of strange events led to his resignation."],
+  "medieval": ["The town is famous for its medieval castle and churches.", "Life in medieval Europe was harsh for ordinary people."],
+  "napkin": ["She wiped her mouth with a paper napkin.", "He folded the napkin neatly and placed it beside his plate."],
+  "proximity": ["The hotel's proximity to the beach makes it very popular.", "Working in close proximity to others can spread illness."],
+  "preside": ["The judge presided over the court with great authority.", "She presided at the annual meeting of the association."],
+  "aesthetic": ["The building's design has a strong aesthetic appeal.", "The garden was planned with great aesthetic care."],
+  "prospect": ["The prospect of losing his job worried him deeply.", "Graduates face excellent job prospects in this field."],
+  "nickname": ["His classmates gave him the nickname 'Einstein'.", "Her nickname at school was 'Smiley'."],
+  "patriotic": ["The patriotic citizens proudly waved the national flag.", "He wrote a patriotic song in honor of his country."],
+  "swamp": ["The heavy rains turned the field into a swamp.", "Work flooded in and threatened to swamp the small team."],
+  "infinite": ["The universe is so vast it seems infinite.", "She showed infinite patience with her students."],
+  "adequate": ["The room is adequate for two people but not for a family.", "Make sure you have adequate time to finish the test."],
+  "swap": ["They agreed to swap their seats so he could see the screen.", "Would you like to swap phone numbers with me?"],
+  "nil": ["The score was two to nil at half-time.", "His chances of winning the race are virtually nil."],
+  "leaflet": ["A volunteer handed me a leaflet about the charity.", "The doctor gave her a leaflet explaining the treatment."],
+  "cozy": ["The cabin was small but cozy and warm.", "We spent a cozy evening by the fire."],
+  "articulate": ["She is able to articulate her ideas clearly and confidently.", "He is an articulate speaker who impresses every audience."],
+  "nonetheless": ["It was raining heavily; nonetheless, they continued the game.", "She was tired; nonetheless, she finished the report."],
+  "evacuate": ["The fire forced the entire building to evacuate.", "Officials ordered residents to evacuate before the hurricane."],
+  "evaporate": ["The puddles quickly evaporate in the hot sun.", "Water evaporates faster when the temperature rises."],
+  "excerpt": ["The teacher read an excerpt from the famous novel.", "The magazine published an excerpt of her memoir."],
+  "deliberate": ["She made a deliberate effort to remain calm during the interview.", "The court found that the damage was deliberate, not accidental."],
+  "substitute": ["He used honey as a substitute for sugar in the recipe.", "A substitute teacher took over the class for a week."],
+  "symmetry": ["The building's design is admired for its perfect symmetry.", "The human face shows natural bilateral symmetry."],
+  "adjacent": ["The hotel is adjacent to the main railway station.", "They live in the house adjacent to ours."],
+  "scent": ["The scent of fresh coffee filled the kitchen.", "The dog followed the thief's scent through the park."],
+  "chapel": ["The hospital has a small chapel where families can pray.", "They held a quiet ceremony in the college chapel."],
+  "intensify": ["The storm intensified as it moved closer to the coast.", "The rivalry between the two teams intensified after the defeat."],
+  "productive": ["The meeting was short but surprisingly productive.", "Fertile soil makes this region highly productive for farming."],
+  "cord": ["She tied the parcel securely with a strong cord.", "The lamp's electric cord was too short to reach the socket."],
+  "doubtless": ["Doubtless, you have already heard the news by now.", "She will doubtless win the first prize in the competition."],
+  "mortal": ["We are all mortal, and no one escapes death.", "The hero was no ordinary mortal, according to the legend."],
+  "momentum": ["The election campaign gained momentum after the debate.", "The boulder rolled down the hill with growing momentum."],
+  "substantial": ["The company made a substantial profit this year.", "There is substantial evidence to support the theory."],
+  "gland": ["The thyroid gland regulates the body's metabolism.", "A swollen gland may indicate an infection."],
+  "agony": ["He cried out in agony when he broke his leg.", "The long wait for the results was sheer agony."],
+  "interfere": ["Please do not interfere in other people's private affairs.", "The loud music interfered with my concentration."],
+  "denote": ["In this diagram, red circles denote dangerous areas.", "The word 'bachelor' denotes an unmarried man."],
+  "perpetual": ["The streams in the mountains are in perpetual motion.", "He complained about the perpetual noise from the street."],
+  "shaft": ["The miners took the elevator down the deep shaft.", "He gripped the wooden shaft of the axe firmly."],
+  "contemplate": ["She contemplated the painting for a long time.", "He is contemplating moving abroad for work."],
+  "irritate": ["His constant tapping irritated the other passengers.", "Some fabrics can irritate sensitive skin."],
+  "fury": ["He was filled with fury at the unfair verdict.", "The hurricane struck the coast with full fury."],
+  "diagnose": ["The doctor diagnosed her with a rare disease.", "It took months to diagnose the mysterious engine fault."],
+  "installment": ["He paid for the laptop in monthly installments.", "The final installment of the loan is due next month."],
+  "implicit": ["Her silence gave implicit approval to the plan.", "The message contained an implicit threat of punishment."],
+  "hound": ["The hound chased the fox across the field.", "He keeps a trained hound for hunting in the forest."],
+  "pore": ["Sweat came out of every pore during the workout.", "The heat opened her pores and made her skin glow."],
+  "alert": ["The guard stayed alert throughout the night.", "Drivers must remain alert when roads are wet."],
+  "sophisticated": ["The novel is written for sophisticated adult readers.", "Her sophisticated taste in wine impressed the guests."],
+  "principal": ["The school principal welcomed the new students.", "She spoke to the principal about the class trip."],
+  "principle": ["He refused to lie on principle.", "The company operates on the principle of fairness."],
+  "envisage": ["The architect envisaged a city surrounded by green parks.", "I can envisage a future where cars drive themselves."],
+  "infant": ["The infant slept peacefully in her crib.", "Infant mortality has fallen sharply in recent decades."],
+  "calcium": ["Milk is rich in calcium, which strengthens bones.", "Calcium supplements may help prevent osteoporosis."],
+  "symphony": ["The orchestra performed Beethoven's Ninth Symphony.", "We listened to a beautiful symphony at the concert hall."],
+  "protest": ["Thousands gathered to protest against the new tax.", "The workers decided to protest for higher wages."],
+  "glide、slide": ["The pair's glide、slide movements were perfectly synchronized.", "He practiced his glide、slide technique every morning on the ice."],
+  "erosion": ["Coastal erosion threatens the houses along the beach.", "Soil erosion can ruin farmland if it is not controlled."],
+  "bust": ["A marble bust of the poet stood on the shelf.", "The museum displayed a bronze bust of the queen."],
+  "hysterical": ["She grew hysterical when she heard the terrible news.", "The fans were hysterical after the winning goal."],
+  "scandal": ["The scandal forced the mayor to resign.", "The newspaper uncovered a major financial scandal."],
+  "olive": ["She added a little olive oil to the salad.", "The dish was garnished with black olives."],
+  "pirate": ["The pirate sailed the Caribbean in search of treasure.", "It is illegal to pirate software from the internet."],
+  "betray": ["He would never betray the trust of his closest friend.", "The spy was caught trying to betray military secrets."],
+  "cliff": ["The castle stood on the edge of a steep cliff.", "We watched the seabirds nest on the cliff face."],
+  "synthesis": ["The essay is a careful synthesis of several studies.", "Photosynthesis is the synthesis of food using sunlight."],
+  "constituent": ["The senator met with her constituents at the town hall.", "Every constituent deserves to be heard by their representative."],
+  "geology": ["She studied geology at a famous university.", "The geology of the region includes ancient volcanic rocks."],
+  "provocative": ["His provocative remarks sparked a heated debate.", "The film's provocative scenes attracted wide controversy."],
+  "tack": ["She pressed a tack into the corkboard to hold the photo.", "A loose tack on the floor could puncture your shoe."],
+  "amplify": ["The microphone amplified his voice across the hall.", "Social media can amplify a small rumor quickly."],
+  "colonial": ["The colonial town preserved its old buildings.", "Colonial powers ruled much of Africa in the nineteenth century."],
+  "dizzy": ["The spinning ride made me feel dizzy.", "She felt dizzy after standing up too quickly."],
+  "crisp": ["The toast was crisp and golden brown.", "I love the crisp air of an autumn morning."],
+  "grant": ["The foundation agreed to grant the school a scholarship fund.", "Please grant me a moment to explain myself."],
+  "hamper": ["Heavy snow may hamper travel tonight.", "Too many rules can hamper small businesses."],
+  "humid": ["The air was hot and humid all summer.", "Humid weather makes the city feel uncomfortable."],
+  "reign": ["During her reign, the country prospered.", "Silence reigned throughout the empty hall."],
+  "drainage": ["Poor drainage caused the field to flood.", "The city improved its drainage system after the storm."],
+  "hemisphere": ["The northern hemisphere experiences winter in December.", "The brain's left hemisphere controls language."],
+  "amend": ["The committee voted to amend the proposal.", "Parliament amended the law to protect consumers."],
+  "prototype": ["The engineers built a prototype of the new engine.", "The prototype worked, but the final model had problems."],
+  "electrician": ["We called an electrician to fix the faulty wiring.", "The electrician installed new lights in the kitchen."],
+  "historian": ["The historian spent years studying ancient records.", "A careful historian relies on primary sources."],
+  "fuse": ["The fuse blew when we plugged in the heater.", "Check the fuse box before calling an electrician."],
+  "blunt": ["She gave a blunt answer that startled her colleagues.", "To be blunt, your proposal has serious flaws."],
+  "tame": ["The sequel was tame compared with the original film.", "Life in the small town felt tame after years in the city."],
+  "tedious": ["Filing tax returns is a tedious task.", "The three-hour meeting was tedious and boring."],
+  "tan": ["She returned from vacation with a deep tan.", "He wore a tan leather jacket to the party."],
+  "tanker": ["The oil tanker sailed slowly through the strait.", "A tanker spilled thousands of gallons of crude oil."],
+  "numerical": ["The students collected numerical data from the experiment.", "Please sort the files in numerical order."],
+  "rigorous": ["The theory passed rigorous testing before publication.", "Candidates must complete a rigorous training program."],
+  "tangle": ["Her hair was a hopeless tangle after the windy walk.", "The cables were in a complete tangle behind the desk."],
+  "linen": ["The bed was dressed with crisp white linen.", "She ironed the linen tablecloth for dinner."],
+  "foresee": ["Nobody could foresee the consequences of the decision.", "The analyst foresees a sharp rise in prices next year."],
+  "plaster": ["He put a plaster on his small cut.", "The nurse covered the wound with a clean plaster."],
+  "intelligible": ["His speech was barely intelligible over the loud noise.", "Please write your answers in an intelligible way."],
+  "culminate in": ["The long negotiations culminated in a peace treaty.", "Her years of hard work culminated in a doctorate."],
+  "analogy": ["She drew an analogy between the heart and a pump.", "The teacher used a clever analogy to explain the atom."],
+  "disrupt": ["The storm disrupted the power supply for hours.", "Loud noise can disrupt a student's concentration."],
+  "cater": ["The restaurant caters to a wide range of tastes.", "The program is designed to cater for busy professionals."],
+  "privilege": ["It is a privilege to speak at this conference.", "Diplomats enjoy special privileges in many countries."],
+  "grieve for": ["The whole nation grieved for the victims of the disaster.", "She still grieves for her beloved grandmother."],
+  "crumble": ["The old castle walls have begun to crumble.", "She crumbled the biscuits into the cake mixture."],
+  "provided": ["You may borrow the car, provided you return it by noon.", "I will join the trip provided the weather stays fine."],
+  "intrigue": ["The novel is full of political intrigue and betrayal.", "Court intrigue brought down several powerful ministers."],
+  "pastime": ["Reading detective novels is my favorite pastime.", "Gardening became her main pastime after retirement."],
+  "resort": ["Faced with heavy debts, he resorted to illegal gambling.", "The island resort attracts thousands of tourists each year."],
+  "alloy": ["Steel is an alloy of iron and carbon.", "They alloy the copper with tin to make it harder."],
+  "climax": ["The story reaches its climax in the final chapter.", "The concert ended at the climax of the symphony."],
+  "tariff": ["The government imposed a tariff on imported steel.", "The new tariff raised the price of foreign cars."],
+  "rectangular": ["The rectangular table seats eight people.", "She placed the rectangular frame on the wall."],
+  "linear": ["The graph shows a linear increase in sales.", "A linear narrative follows events in chronological order."],
+  "module": ["Each module of the course lasts four weeks.", "The spacecraft's lunar module landed safely."],
+  "scorn": ["The critics poured scorn on the new film.", "They scorned the suggestion as completely impractical."],
+  "hinder": ["Heavy rain hindered the rescue efforts.", "A lack of funding hindered the research project."],
+  "tease": ["The boys like to tease their younger sister.", "Don't tease the dog, or it might bite you."],
+  "be indicative of": ["High fever is often indicative of an infection.", "His confident tone was indicative of real experience."],
+  "ideology": ["The party's ideology influenced its economic policy.", "Their ideology rejected all forms of foreign intervention."],
+  "telecommunications": ["The telecommunications industry is growing rapidly.", "He works for a large telecommunications company."],
+  "attain": ["She attained her goal of running a marathon.", "Few students attain the highest grade in every subject."],
+  "stray": ["A few soldiers strayed from the main column.", "Do not let your thoughts stray during the lecture."],
+  "remedy": ["The new drug can remedy the worst symptoms.", "We must remedy the error before the report goes out."],
+  "cane": ["The old man leaned on his cane as he walked.", "Sugar is made from the juice of the sugar cane plant."],
+  "inferior": ["This product is inferior to the one we used before.", "He refused to accept work of inferior quality."],
+  "grease": ["The mechanic wiped the grease from his hands.", "Be sure to grease the pan before baking the cake."],
+  "temperament": ["She has a calm temperament that suits her job.", "The two dogs had completely different temperaments."],
+  "bypass": ["The driver bypassed the traffic jam by taking a back road.", "A bypass operation can improve blood flow to the heart."],
+  "consolidate": ["The merger helped consolidate the company's market power.", "Regular reviews help consolidate what you have learned."],
+  "assert": ["It is important to assert your rights at work.", "She asserts that the data has been fully verified."],
+  "henceforth": ["Henceforth, all employees must clock in before nine.", "The company announced it would go green henceforth."],
+  "limp": ["He limped home after twisting his ankle.", "The wounded soldier limped toward the medical tent."],
+  "recede": ["The floodwaters slowly receded from the village.", "The coastline receded as the sea level rose."],
+  "cordial": ["They gave us a cordial welcome at the airport.", "The two leaders held a cordial conversation over lunch."],
+  "groan": ["He let out a groan when he saw the pile of dishes.", "The audience groaned at the terrible joke."],
+  "moan": ["The patient moaned in pain throughout the night.", "Stop moaning about the heat and open a window."],
+  "decesive": ["Her decesive tone convinced everyone to act at once.", "The coach wanted a decesive player for the final match."],
+  "tempor": ["The professor noted that 'tempor' is a Latin root meaning time.", "Words like temporary and contemporary contain the root tempor."],
+  "tempo": ["The pianist increased the tempo of the final movement.", "Visitors are often surprised by the city's fast tempo."],
+  "coincide": ["My holiday coincided with the local festival.", "Their views on this matter happen to coincide."],
+  "disregard": ["He chose to disregard the doctor's advice.", "Never disregard the safety instructions in the lab."],
+  "belly": ["The baby's belly rose and fell as it breathed.", "He laughed so hard his belly ached."],
+  "shuttle": ["The space shuttle landed safely after its mission.", "A shuttle bus runs between the hotel and the airport."],
+  "counter": ["The waiter placed the bill on the counter.", "She slid the chips across the counter during the game."],
+  "container": ["The ship carried thousands of containers across the ocean.", "Store the leftovers in an airtight container."],
+  "tempt": ["The offer of a higher salary tempted her to switch jobs.", "Don't tempt fate by driving without a seatbelt."],
+  "paralyze": ["The accident paralyzed him from the waist down.", "Fear paralyzed the driver at the moment of impact."],
+  "tenant": ["The tenant complained about the leaking roof.", "Each tenant must sign a one-year lease."],
+  "hover": ["The helicopter hovered above the crowded square.", "She hovered near the door, unsure whether to enter."],
+  "lace up": ["She bent down to lace up her running shoes.", "He laced up his boots before the long hike."],
+  "shabby": ["He lived in a shabby apartment near the station.", "The man wore a shabby coat that had seen better days."],
+  "extinguish": ["Firefighters quickly extinguished the kitchen fire.", "Please extinguish all cigarettes before entering."],
+  "dim": ["The room was lit by a single dim bulb.", "My dim memory of the event has faded with time."],
+  "blur": ["The city lights became a colorful blur at night.", "Tears blurred her vision during the ceremony."],
+  "inflict": ["The dictator inflicted terrible suffering on his people.", "The storm inflicted serious damage on the coastal towns."],
+  "pistol": ["The officer carried a pistol in a leather holster.", "He aimed the pistol carefully at the target."],
+  "mansion": ["The millionaire lives in a grand mansion on the hill.", "The old mansion was converted into a luxury hotel."],
+  "boycott": ["Consumers threatened to boycott the company's products.", "Several countries decided to boycott the international meeting."],
+  "heir": ["The young prince is the heir to the throne.", "She became the heir to her uncle's estate."],
+  "certify": ["The laboratory certified the product as safe.", "I can certify that this document is authentic."],
+  "overhear": ["I accidentally overheard their conversation at the next table.", "The children overheard the adults arguing."],
+  "flush": ["Her cheeks flushed with pride at the applause.", "The company is flush with cash after the successful sale."],
+  "circulation": ["Regular exercise improves your blood circulation.", "The newspaper has a wide national circulation."],
+  "bump into": ["I bumped into an old friend at the supermarket.", "Be careful not to bump into the table in the dark."],
+  "exaggerate": ["Don't exaggerate the importance of one mistake.", "He tends to exaggerate his achievements during interviews."],
+  "grave": ["They laid fresh flowers on the grave of the soldier.", "The doctor's face turned grave when she read the results."],
+  "ethnic": ["The museum displays artifacts from many ethnic groups.", "The country was torn apart by ethnic conflict."],
+  "incur": ["You will incur extra charges if you cancel the booking.", "Reckless driving can incur serious legal penalties."],
+  "recur": ["The same technical problem tends to recur every spring.", "That melody seems to recur throughout the entire symphony."],
+  "impart": ["A good teacher can impart knowledge with genuine enthusiasm.", "The spokesperson refused to impart the details of the deal."],
+  "import": ["Many countries import oil to meet their energy demands.", "The company plans to import machinery from Germany."],
+  "refuge": ["The mountain cabin offered a quiet refuge from the city.", "Thousands of families sought refuge in neighboring countries."],
+  "scrape": ["She used a knife to scrape the old paint off the window.", "We had to scrape together enough money for the rent."],
+  "inevitable": ["Change is inevitable in any growing organization.", "Given the heavy rain, long delays were inevitable."],
+  "tentative": ["The two sides reached a tentative agreement after long talks.", "She made a tentative attempt to enter the dark room."],
+  "frantic": ["The parents made a frantic search for their lost child.", "A frantic crowd pushed toward the only open exit."],
+  "divert": ["Police had to divert traffic away from the accident scene.", "The comedian tried to divert attention from his mistake."],
+  "spiral": ["The staircase rose in a tight spiral to the top floor.", "Rising costs sent the economy into a downward spiral."],
+  "render": ["The software can render complex images in just seconds.", "The injury may render him unable to play again."],
+  "terminate": ["The company decided to terminate the contract early.", "The two nations agreed to terminate the old treaty."],
+  "conspicuous": ["The bright yellow sign was conspicuous from a distance.", "His absence was conspicuous at the annual meeting."],
+  "prose": ["Her prose is admired for its clarity and rhythm.", "He prefers writing poetry to composing plain prose."],
+  "pretext": ["He left the party on the pretext of feeling unwell.", "They used the incident as a pretext to invade the country."],
+  "artillery": ["The enemy artillery shelled the town all night.", "The soldiers were forced to take cover by artillery fire."],
+  "dwell": ["Many rare species dwell in the depths of the ocean.", "Try not to dwell on past failures for too long."],
+  "parameter": ["We must adjust the parameters before running the simulation.", "Time is an important parameter in this experiment."],
+  "scramble": ["The hikers had to scramble up the steep rocky slope.", "Children often scramble for the coins thrown on the floor."],
+  "compulsory": ["English is a compulsory subject in most schools.", "Military service is compulsory for all young men there."],
+  "flask": ["He poured hot tea from his flask at the campsite.", "She kept drinking water in a metal flask during the hike."],
+  "terrace": ["The farmers built a terrace on the hillside for growing rice.", "We had breakfast on the terrace overlooking the garden."],
+  "pasture": ["The cows grazed peacefully in the green pasture.", "Sheep were moved to a higher pasture for the summer."],
+  "sieve": ["She poured the flour through a sieve to remove lumps.", "Use a sieve to drain the water from the boiled pasta."],
+  "mediate": ["The United Nations sent a diplomat to mediate the dispute.", "A neutral lawyer was asked to mediate between the two firms."],
+  "ammunition": ["The troops ran short of ammunition during the long battle.", "His careless mistakes gave critics plenty of ammunition."],
+  "decree": ["The king issued a decree banning the old customs.", "The court can decree that the property be returned to its owner."],
+  "cucumber": ["She sliced a fresh cucumber into the salad.", "A fresh cucumber adds a crisp flavor to summer salads."],
+  "terrain": ["The rugged terrain made the journey extremely difficult.", "The army studied the terrain before planning the attack."],
+  "robust": ["The new engine is robust enough to handle harsh conditions.", "The economy showed robust growth in the last quarter."],
+  "saturate": ["Heavy rain began to saturate the dry, cracked ground.", "Too many similar products saturate the market and confuse buyers."],
+  "scatter": ["The wind will scatter the fallen leaves across the lawn.", "The farmer had to scatter seeds over the plowed field."],
+  "defect": ["The car was recalled because of a serious brake defect.", "A tiny defect in the glass reduced its value."],
+  "detect": ["Doctors can detect the disease at an early stage.", "The sensor can detect even tiny changes in temperature."],
+  "convict": ["The jury voted to convict him of robbery.", "It is hard to convict someone without reliable evidence."],
+  "ingredient": ["Fresh garlic is a key ingredient in this sauce.", "Trust is an essential ingredient of any friendship."],
+  "retort": ["She was quick to retort when he criticized her work.", "His sharp retort ended the argument immediately."],
+  "terrific": ["We saw a terrific thunderstorm last night.", "She did a terrific job organizing the whole event."],
+  "mobilize": ["The government must mobilize its resources to fight the flood.", "Volunteers worked to mobilize support for the charity."],
+  "mobile": ["The mobile clinic travels to remote villages every week.", "She stays mobile and active even in her eighties."],
+  "assassination": ["The assassination of the leader shocked the entire nation.", "The plot for the assassination was uncovered in time."],
+  "economical": ["This small car is very economical on fuel.", "We need an economical way to heat the whole building."],
+  "desirable": ["A quiet neighborhood is highly desirable for families.", "The house has many desirable features, including a large garden."],
+  "instrumental": ["The piece is purely instrumental, with no singing at all.", "Her contribution was instrumental to the project's success."],
+  "instrumental in": ["Her advice was instrumental in shaping my final decision.", "He was instrumental in organizing the charity concert."],
+  "testify": ["Several witnesses will testify at the trial next week.", "Her achievements testify to years of dedicated effort."],
+  "gamble": ["He tends to gamble away his entire salary every month.", "It is a gamble to invest in such an unstable market."],
+  "alarm": ["The rising floodwater could alarm the entire village.", "Don't alarm her; the test results are actually quite good."],
+  "forge": ["The blacksmith can forge a strong iron sword.", "The two nations agreed to forge a new alliance after the war."],
+  "testimony": ["Her testimony was crucial to winning the case.", "These old photographs are a testimony to a bygone era."],
+  "detain": ["Police may detain suspects for questioning.", "A sudden meeting detained us at the office past midnight."],
+  "texture": ["The smooth texture of the fabric feels very luxurious.", "This lotion can improve the texture of dry skin."],
+  "acquaintance": ["I have a slight acquaintance with French literature.", "He made many acquaintances during his year abroad."],
+  "migrant": ["The city attracts thousands of migrant workers each year.", "Many migrant birds fly south before the winter sets in."],
+  "mingle with": ["Tourists often mingle with locals at the night market.", "The aroma of spices seems to mingle with the sea air."],
+  "theft": ["The store installed cameras to prevent theft.", "He was arrested on suspicion of theft."],
+  "mutter": ["He would mutter to himself while working late.", "She tends to mutter complaints under her breath."],
+  "dissipate": ["The morning sun will dissipate the fog by noon.", "He managed to dissipate his inheritance within a year."],
+  "eliminate": ["We must eliminate all errors before publishing the report.", "The new policy aims to eliminate poverty in the region."],
+  "professional": ["She is a skilled professional in the field of law.", "He handled the crisis with a truly professional attitude."],
+  "elementary": ["The book covers elementary grammar for beginners.", "Mixing the wrong chemicals is an elementary mistake."],
+  "fertilizer": ["Farmers use chemical fertilizer to increase crop yields.", "Compost makes an excellent natural fertilizer for the garden."],
+  "aggregate": ["The software can aggregate data from many different sources.", "We must aggregate the results before drawing any conclusions."],
+  "obscene": ["He was fined for making obscene gestures in public.", "The film contains obscene language that offended many viewers."],
+  "criterion": ["Price is the main criterion when choosing a phone.", "Wealth is not the only criterion for judging success."],
+  "queer": ["I felt a queer sensation in my stomach after lunch.", "A queer silence filled the empty old house."],
+  "thereafter": ["She moved to London and thereafter rarely visited home.", "He was promoted in 2020 and thereafter became very busy."],
+  "mistress": ["His affair with his mistress was eventually discovered.", "The scandal revealed that he had kept a mistress for years."],
+  "promising": ["She is a promising young scientist with a bright future.", "The new project has a promising start despite limited funds."],
+  "parasite": ["The parasite lives inside the host's intestine.", "He was called a parasite for living off his relatives."],
+  "famine": ["The famine left thousands of people starving.", "The prolonged drought caused a severe famine across the region."],
+  "militant": ["The militant group claimed responsibility for the attack.", "His militant attitude made negotiations very difficult."],
+  "dilute": ["You can dilute the strong juice with a little water.", "The company decided to dilute its shares to raise capital."],
+  "slaughter": ["Farmers were forced to slaughter thousands of infected cattle.", "It is cruel to slaughter healthy animals for no reason."],
+  "consequently": ["He missed the deadline; consequently, he lost the contract.", "It rained heavily, and consequently the match was cancelled."],
+  "thermal": ["The thermal imaging camera detected the heat leak.", "We bathed in natural thermal springs during the trip."],
+  "inaugurate": ["The president will inaugurate the new bridge tomorrow.", "The festival will inaugurate the city's cultural season."],
+  "drought": ["The prolonged drought destroyed most of the crops.", "Farmers struggled to survive during the severe drought."],
+  "thesis": ["She defended her doctoral thesis last week.", "His central thesis is that education drives economic growth."],
+  "flaw": ["There is a serious flaw in your argument.", "A tiny flaw in the diamond reduced its value."],
+  "thigh": ["He injured his thigh during the football match.", "The patient complained of a dull pain in her thigh."],
+  "smash": ["The movie was a smash hit at the box office.", "He used a hammer to smash the old window."],
+  "thorn": ["A sharp thorn pricked my finger while I was gardening.", "Watch out for the long thorn on that rose stem."],
+  "brood on": ["He tends to brood on his mistakes for days.", "She would brood on the decision until late at night."],
+  "compensate": ["The insurance will compensate you for the lost luggage.", "She tried to compensate for her lack of experience with hard work."],
+  "excursion": ["We went on a day excursion to the nearby lake.", "The school organized an excursion to the science museum."],
+  "confront": ["She must confront her fear of public speaking.", "The police will confront the suspect with new evidence."],
+  "a chunk of bread": ["He tore off a chunk of bread and dipped it in soup.", "She handed the hungry child a chunk of bread."],
+  "prevail": ["Reason should prevail over prejudice in any debate.", "The custom still prevails in some rural areas."],
+  "threshold": ["He paused at the threshold before entering the hall.", "The research is on the threshold of a major breakthrough."],
+  "galaxy": ["Our galaxy contains billions of stars and planets.", "The Milky Way is the galaxy that includes our solar system."],
+  "shutter": ["He pressed the shutter to capture the perfect moment.", "A loose shutter banged against the window in the storm."],
+  "hazard": ["Fog is a serious hazard for drivers on this road.", "Smoking poses a major health hazard."],
+  "coarse": ["The coarse sand hurt my bare feet.", "His coarse language offended many of the guests."],
+  "justification": ["There is no justification for such rude behavior.", "He offered no justification for missing the meeting."],
+  "thrill": ["The roller coaster gave me an incredible thrill.", "Winning the award was a thrill for the whole team."],
+  "endeavor": ["We endeavor to provide the best service possible.", "Her endeavor to find a cure lasted for decades."],
+  "thrive": ["These plants thrive in warm, humid conditions.", "Small businesses thrive in this busy market town."],
+  "shield": ["The umbrella served as a shield against the strong sun.", "Parents often shield their children from harsh truths."],
+  "invisible": ["The bacteria are invisible to the naked eye.", "The invisible ink became visible under the lamp."],
+  "marshal": ["The marshal led the parade through the city.", "The federal marshal supervised the security operations."],
+  "throne": ["The prince ascended the throne after his father died.", "The queen has occupied the throne for over sixty years."],
+  "meadow": ["Cows grazed in the meadow beside the river.", "We had a picnic in a beautiful wildflower meadow."],
+  "provoke": ["His rude remarks could provoke a heated argument.", "The unfair decision may provoke widespread protests."],
+  "evoke": ["The old song can evoke memories of my childhood.", "The painting seems to evoke a deep sense of peace."],
+  "tickle": ["The feather gave me a tickle on the nose.", "She felt a tickle in her throat before coughing."],
+  "tile": ["A loose tile fell from the roof during the storm.", "We chose a glossy tile for the kitchen floor."],
+  "indefinite": ["The meeting has been postponed for an indefinite period.", "She gave an indefinite answer that satisfied no one."],
+  "restore": ["The workers will restore the old castle to its former glory.", "A good night's sleep can restore your energy completely."],
+  "tilt": ["He tends to tilt his head when he is thinking.", "The boat began to tilt dangerously in the rough sea."],
+  "beforehand": ["Please book your tickets beforehand to avoid disappointment.", "She prepared all the ingredients beforehand."],
+  "knit": ["My grandmother can knit a warm sweater in a week.", "The surgeon had to knit the broken bones back together."],
+  "timely": ["The timely warning saved many lives.", "His timely intervention prevented a serious accident."],
+  "devise": ["Engineers will devise a new system to save energy.", "We need to devise a plan to solve this problem."],
+  "remnant": ["A remnant of the old wall still stands behind the house.", "Only a small remnant of the original forest remains today."],
+  "generate": ["The new turbine can generate enough electricity for the town.", "The survey is likely to generate great public interest."],
+  "perish": ["Many species will perish if their habitats are destroyed.", "Most of the flowers perish in the sudden frost."],
+  "dismay": ["To her dismay, the last train had already left.", "The students stared at their test results in dismay."],
+  "timid": ["The timid girl avoided speaking in class.", "A timid knock came from the front door."],
+  "ritual": ["Brushing my teeth is part of my morning ritual.", "The tribe performs a ritual to honor the harvest."],
+  "revive": ["Doctors tried to revive the unconscious patient.", "The government hopes to revive the struggling economy."],
+  "locomotive": ["The museum restored a historic steam locomotive.", "Muscles are the locomotive organs that enable us to move."],
+  "arrange": ["She will arrange the flowers in a beautiful vase.", "We need to arrange a meeting with the client."],
+  "cardinal": ["Honesty is a cardinal virtue in any society.", "The cardinal rule is to never share your password."],
+  "gaze": ["She would gaze at the stars for hours at night.", "His gaze lingered on the old photograph."],
+  "blush": ["She tends to blush whenever she is praised.", "The compliment made his cheeks blush with embarrassment."],
+  "token": ["This gift is a small token of our gratitude.", "Please exchange this token for a meal at any branch."],
+  "novelty": ["The novelty of the new gadget soon wore off.", "The tourists enjoyed the novelty of the local cuisine."],
+  "jerk": ["The sudden jerk of the bus threw passengers off balance.", "He gave the rope a firm jerk to tighten the knot."],
+  "hypothesis": ["The experiment was designed to test the scientist's hypothesis.", "His initial hypothesis turned out to be completely wrong."],
+  "limb": ["The storm damaged one of the tree's main limbs.", "The climber lost a limb in the mountain fall."],
+  "simultaneous": ["The two teams made simultaneous announcements about the merger.", "A simultaneous translation system was installed for the conference."],
+  "fabulous": ["They spent a fabulous holiday on the tropical island.", "The actress wore a fabulous dress to the awards ceremony."],
+  "feat": ["Climbing the mountain in winter was an incredible feat.", "The rescue of the trapped miners was a remarkable feat."],
+  "grill": ["We will grill fresh fish over the open fire tonight.", "The reporters will grill the minister about the scandal."],
+  "judicial": ["The judicial system must remain independent of politics.", "She made a judicial decision after weighing all the evidence."],
+  "longitude": ["The captain calculated the ship's longitude using the stars.", "The city lies at a longitude of 116 degrees east."],
+  "toss": ["We tossed a coin to settle the argument.", "He tossed his jacket onto the sofa before dinner."],
+  "blossom": ["The cherry trees blossom every spring in the park.", "Her talent began to blossom after years of practice."],
+  "hospitality": ["The locals are famous for their warm hospitality.", "We were overwhelmed by the hospitality of our hosts."],
+  "tow": ["The truck came to tow our broken-down car away.", "The rescue boat towed the sinking vessel back to shore."],
+  "discrete": ["The data falls into several discrete categories.", "Each chapter deals with a discrete stage of the project."],
+  "soluble": ["Salt is soluble in water, but oil is not.", "The medication comes in a water-soluble powder form."],
+  "foil": ["The dark dress served as a perfect foil for her bright hair.", "Wrap the leftover fish tightly in aluminum foil."],
+  "slippery": ["The path became slippery after the heavy rain.", "That politician is a slippery character who avoids straight answers."],
+  "cave": ["The explorers discovered a vast cave beneath the mountain.", "Bats roost in the dark cave during the day."],
+  "toxic": ["The factory was fined for releasing toxic waste into the river.", "Avoid toxic relationships that drain your energy."],
+  "epidemic": ["The flu reached epidemic proportions across the region.", "Obesity has become an epidemic health problem worldwide."],
+  "anonymous": ["An anonymous donor gave a million dollars to the library.", "She received an anonymous letter threatening her safety."],
+  "coverage": ["The election received extensive coverage in the national press.", "The insurance policy provides full coverage for medical expenses."],
+  "tract": ["The campaign distributed a tract outlining its main policies.", "They own a vast tract of land in the northern wilderness."],
+  "cling": ["The child clung to her mother's hand in the crowd.", "Wet clothes tend to cling to the skin."],
+  "trademark": ["The logo is a registered trademark of the company.", "Her trademark laugh makes her instantly recognizable."],
+  "indignation": ["The unfair verdict provoked widespread public indignation.", "She voiced her indignation at the rude treatment she received."],
+  "tragic": ["The play ends with a tragic loss of the hero.", "It was a tragic accident that could have been prevented."],
+  "trait": ["Honesty is a trait greatly admired in any leader.", "Researchers linked the trait to a specific gene."],
+  "demonstrate": ["The experiment clearly demonstrates that the theory is correct.", "Workers demonstrated in the streets for higher wages."],
+  "possess": ["She possesses an extraordinary ability to remain calm.", "The museum possesses a remarkable collection of ancient coins."],
+  "deduct": ["The bank will deduct the fee from your account automatically.", "Employers deduct income tax from each paycheck."],
+  "Easter": ["Children love hunting for eggs at Easter.", "Many families attend church services on Easter Sunday."],
+  "intermittent": ["Intermittent rain forced us to delay the picnic.", "The patient suffered from intermittent pain throughout the week."],
+  "specific": ["Please give me the specifics of your travel plan.", "The doctor gave specific instructions about the medication."],
+  "extract": ["The dentist had to extract the damaged tooth.", "Vanilla extract is often used in baking desserts."],
+  "cabinet": ["She keeps her finest china in the glass cabinet.", "The prime minister reshuffled his cabinet ministers."],
+  "ornament": ["The Christmas tree was covered with colorful ornaments.", "A small golden ornament hung above the fireplace."],
+  "norm": ["Working overtime has become the norm in many companies.", "Behavior that deviates from the norm is often punished."],
+  "reckon": ["I reckon the journey will take about three hours.", "Analysts reckon the economy will recover next year."],
+  "ceramic": ["She collected ceramic bowls from many countries.", "The ceramic tiles are resistant to heat and moisture."],
+  "digest": ["It takes time for the body to digest heavy food.", "I need a few days to digest all this information."],
+  "transcend": ["Great art can transcend cultural and historical boundaries.", "Her performance transcended the expectations of the audience."],
+  "extravagant": ["They threw an extravagant party to celebrate their success.", "He was criticized for his extravagant spending habits."],
+  "reproach": ["She reproached him for forgetting their anniversary.", "His eyes were full of reproach at my careless remark."],
+  "retention": ["Regular review improves long-term memory retention.", "The company struggles with employee retention each year."],
+  "flap": ["The bird flapped its wings and took off quickly.", "Don't flap; we still have plenty of time to fix it."],
+  "transient": ["The city's transient population grows during the summer.", "We experienced a transient sense of joy before the news."],
+  "specification": ["The engineer checked the specifications before installing the parts.", "Please follow the manufacturer's specification when assembling the machine."],
+  "inhibit": ["Fear of failure can inhibit creative thinking.", "Certain drugs inhibit the growth of harmful bacteria."],
+  "crave": ["After days of dieting, she craved a thick slice of cake.", "He craved a sense of belonging among his peers."],
+  "empirical": ["The theory is supported by strong empirical evidence.", "Scientists rely on empirical data to test their hypotheses."],
+  "relay": ["The station relayed the live concert to millions of viewers.", "Please relay my message to the manager when you see her."],
+  "cereal": ["She pours milk over her cereal every morning.", "Wheat is the main cereal grown in this region."],
+  "transistor": ["The invention of the transistor revolutionized electronic devices.", "Old radios used transistors to amplify signals."],
+  "transit": ["The goods were damaged during transit to the warehouse.", "The city is expanding its public transit system."],
+  "specialty": ["Seafood is the specialty of this coastal restaurant.", "Her specialty is repairing antique clocks."],
+  "prosecute": ["The district attorney decided to prosecute the case.", "Companies found guilty will be prosecuted under the new law."],
+  "transition": ["The country is in transition from a farming to an industrial economy.", "She handled the transition to remote work smoothly."],
+  "permeate": ["The smell of fresh coffee permeated the entire office.", "A sense of optimism permeated the conference hall."],
+  "inhabitant": ["The island's inhabitants depend on fishing for a living.", "Local inhabitants protested against the new highway."],
+  "refund": ["The store gave me a full refund for the faulty laptop.", "You can request a refund within thirty days of purchase."],
+  "linger": ["We lingered in the cafe long after finishing our coffee.", "The smell of smoke lingered in the room for hours."],
+  "converge": ["Thousands of fans converged on the stadium for the final.", "The two rivers converge just north of the city."],
+  "incentive": ["The bonus plan provides a strong incentive for hard work.", "Tax cuts are used as an incentive to attract foreign investment."],
+  "literary": ["She studied literary criticism at university.", "His literary works earned him a national prize."],
+  "disgust": ["The smell of rotting meat filled me with disgust.", "She looked at the mess in disgust."],
+  "fling": ["He flung his bag onto the floor in frustration.", "She flung open the window to let in fresh air."],
+  "rupture": ["The rupture in the pipeline caused a major oil leak.", "An old sports injury led to a rupture of his knee ligament."],
+  "gleam": ["A faint gleam of light appeared through the trees.", "Her eyes had a mischievous gleam when she smiled."],
+  "salvation": ["The rescue team was their only hope of salvation.", "Hard work proved to be the salvation of the failing business."],
+  "redundant": ["The word 'true' is redundant in the phrase 'true facts'.", "Hundreds of workers were made redundant when the factory closed."],
+  "portray": ["The novel portrays rural life in the nineteenth century.", "The media often portray scientists as eccentric geniuses."],
+  "intensive": ["She completed an intensive language course in six weeks.", "The patient requires intensive care after the surgery."],
+  "reconciliation": ["The two countries finally reached a reconciliation after years of conflict.", "She attempted a reconciliation with her estranged brother."],
+  "enforce": ["The government must enforce the new safety regulations.", "Police were sent to enforce the curfew."],
+  "traverse": ["The explorers traversed the desert on camels.", "The bridge allows vehicles to traverse the wide river."],
+  "treaty": ["The two nations signed a peace treaty in 1990.", "Under the treaty, both sides agreed to reduce nuclear weapons."],
+  "blunder": ["He blundered through the dark hallway, knocking over a lamp.", "The company blundered badly by ignoring customer complaints."],
+  "fuel": ["The rocket needs tons of fuel to reach orbit.", "Rising fuel prices pushed up the cost of transport."],
+  "resent": ["She resented being treated like a child.", "He resented the success of his younger colleague."],
+  "afflict": ["The region is afflicted by drought every summer.", "A rare disease afflicted many children in the village."],
+  "given": ["Given the weather, we decided to cancel the trip.", "At any given moment, thousands of planes are in the air."],
+  "indulge": ["She occasionally indulges in a slice of chocolate cake.", "Parents should not indulge their children's every demand."],
+  "trench": ["Workers dug a trench to lay the underground cables.", "The soldiers spent months living in the muddy trenches."],
+  "defy": ["The protestors defied the ban on public gatherings.", "His latest invention seems to defy the laws of physics."],
+  "quest": ["The knight set out on a quest to find the lost sword.", "His quest for knowledge took him to libraries around the world."],
+  "tribute": ["The concert was a tribute to the famous composer.", "She paid tribute to her teachers in her acceptance speech."],
+  "revolve": ["The Earth revolves around the Sun once a year.", "Her whole life revolves around her children."],
+  "cable": ["A broken cable caused the power outage last night.", "The company laid new cables under the ocean floor."],
+  "attendant": ["A flight attendant helped me find my seat.", "The parking attendant directed us to an empty space."],
+  "trifle": ["They quarreled over a mere trifle.", "He refused to waste time on such trifles."],
+  "fringe": ["She cut her fringe to keep it out of her eyes.", "The fringe of the carpet was getting worn."],
+  "transmission": ["The transmission of the disease can be prevented by washing hands.", "The radio station began its transmission at midnight."],
+  "inherent": ["There is an inherent risk in every investment.", "The desire to survive is inherent in all living creatures."],
+  "inherit": ["She inherited a small fortune from her grandmother.", "Children inherit physical traits from both parents."],
+  "mute": ["Please switch your phone to mute during the meeting.", "The movie started on mute and we missed the opening lines."],
+  "fraction": ["Only a small fraction of the applicants were accepted.", "He finished the task in a fraction of the expected time."],
+  "gross": ["The accountant was fired for gross negligence.", "That joke was so gross that nobody laughed."],
+  "metropolitan": ["She prefers the fast pace of metropolitan life.", "The metropolitan police handled the case efficiently."],
+  "clarity": ["The teacher explained the concept with great clarity.", "For clarity, please write your answers in full sentences."],
+  "ambiguous": ["His ambiguous answer left everyone confused.", "The contract contained ambiguous terms that caused disputes."],
+  "speculate": ["Analysts speculate that the company will merge soon.", "We can only speculate about what happened that night."],
+  "dodge": ["He managed to dodge the question about his plans.", "The car swerved to dodge a pedestrian crossing the road."],
+  "triple": ["The company reported a triple increase in profits.", "She received triple the usual salary for working overtime."],
+  "overlook": ["It is easy to overlook small errors in a long report.", "The hotel room overlooks a beautiful sandy bay."],
+  "grief": ["She was overcome with grief after losing her dog.", "Time slowly healed his grief over the loss."],
+  "clockwise": ["Turn the dial clockwise to increase the volume.", "The dancers moved in a clockwise direction around the fire."],
+  "anti-clockwise": ["To unscrew the lid, turn it anti-clockwise.", "The wind swirled anti-clockwise around the cyclone's center."],
+  "deceive": ["He deceived his customers with false advertising.", "Appearances can deceive, so check the facts."],
+  "rehearsal": ["The band held a final rehearsal before the concert.", "The wedding rehearsal took place at the church on Friday."],
+  "triumph": ["Winning the championship was a personal triumph for her.", "The bridge stands as a triumph of modern engineering."],
+  "trivial": ["They argued about a trivial matter for hours.", "Don't waste energy on trivial details."],
+  "tub": ["She soaked in a hot tub to relax after work.", "He filled a tub with water for the laundry."],
+  "tuck": ["She tucked the blanket around the sleeping child.", "He tucked his shirt into his trousers before the meeting."],
+  "tug": ["The little boy tugged at his mother's sleeve.", "She felt a tug on the rope from the other side."],
+  "oak": ["The old oak provides shade for the whole garden.", "This table is made of solid oak wood."],
+  "derive": ["Many English words derive from Latin.", "She derives great satisfaction from her volunteer work."],
+  "brew": ["I brew a fresh pot of coffee every morning.", "Let the tea brew for a few minutes before drinking."],
+  "generalize": ["It is dangerous to generalize from a single example.", "Scientists generalize their findings to a wider population."],
+  "appliance": ["This kitchen appliance makes it easy to prepare a healthy meal.", "Modern appliance stores offer a wide range of household machines."],
+  "discharge": ["A sudden discharge of static electricity can damage sensitive computer chips.", "The factory was fined for the illegal discharge of chemical waste into the river."],
+  "homogeneous": ["Mix the solution until the particles form a homogeneous mixture.", "The population of the small town is remarkably homogeneous in origin."],
+  "routine": ["My morning routine includes coffee, a short run, and reading the news.", "The doctor said it was just a routine check-up with nothing unusual."],
+  "commend": ["The teacher commended her student for his outstanding performance.", "I commend this novel to anyone who enjoys historical fiction."],
+  "ascend": ["The climbers began to ascend the steep mountain at dawn.", "She watched the balloon ascend slowly into the morning sky."],
+  "tunnel": ["The train disappeared into the dark tunnel beneath the river.", "Workers spent five years drilling a tunnel through the mountain."],
+  "resume": ["Let us resume our discussion after the coffee break.", "The negotiations will resume next week after a short pause."],
+  "respective": ["The two teams returned to their respective locker rooms after the match.", "Each student submitted a report on their respective research topic."],
+  "segregate": ["The library segregates rare books from the general collection.", "It is illegal to segregate students on the basis of race."],
+  "contaminate": ["Chemical waste from the plant could contaminate the local water supply.", "Be careful not to contaminate the sample with dirt from your hands."],
+  "controversy": ["The new policy sparked a heated controversy among citizens.", "The book caused considerable controversy when it was first published."],
+  "turnover": ["The company reported a turnover of ten million dollars last year.", "The restaurant's high staff turnover forced managers to hire constantly."],
+  "array": ["The museum displayed an impressive array of ancient artifacts.", "Consumers can choose from a wide array of smartphone models."],
+  "perplex": ["The strange symbol perplexed even the most experienced linguists.", "Her sudden decision to resign perplexed all of her colleagues."],
+  "naive": ["It was naive of him to believe the stranger's promises.", "The young reporter asked a naive question about international trade."],
+  "fitting": ["We ordered new brass fittings for the bathroom renovation.", "It is fitting to celebrate her retirement with a small party."],
+  "complexion": ["Regular sleep and a healthy diet can improve your complexion.", "The new evidence changed the whole complexion of the case."],
+  "forthcoming": ["The forthcoming election will decide the country's future.", "She was not forthcoming about her plans for the summer."],
+  "confer": ["The university will confer an honorary degree on the famous scientist.", "The president conferred with his advisors before making the decision."],
+  "intuition": ["My intuition told me that something was wrong with the plan.", "She trusted her intuition and chose the less obvious route."],
+  "deprive": ["The court cannot deprive a citizen of the right to vote.", "Lack of sleep can deprive students of the energy they need to study."],
+  "tutor": ["Her tutor helped her revise her thesis before submission.", "He works as a private tutor to earn extra money."],
+  "corrode": ["Salt water can corrode the metal hull of a ship.", "Jealousy slowly corroded their friendship over the years."],
+  "aerial": ["The aerial view of the coastline was breathtaking.", "An aerial photograph showed the full extent of the flood damage."],
+  "ultraviolet": ["Ultraviolet rays can damage your skin if you stay in the sun too long.", "The laboratory uses ultraviolet light to sterilize the equipment."],
+  "Renaissance": ["Leonardo da Vinci was a leading figure of the Italian Renaissance.", "The Renaissance brought about a great revival of art and learning."],
+  "rational": ["A rational decision should be based on evidence rather than emotion.", "She remained calm and rational throughout the difficult negotiation."],
+  "deficit": ["The government promised to reduce the budget deficit next year.", "The country's trade deficit widened as imports outpaced exports."],
+  "diplomat": ["The diplomat spent thirty years representing his country abroad.", "A skilled diplomat must remain patient in tense negotiations."],
+  "instance": ["In this instance, the cheaper option proved more reliable.", "There are many instances of wild animals adapting to city life."],
+  "motive": ["The police are still trying to establish the killer's motive.", "Her main motive for learning French was to study in Paris."],
+  "preview": ["The film's preview looked so exciting that I booked tickets at once.", "We watched a preview of the new documentary before its official release."],
+  "underlying": ["The doctor needs to identify the underlying cause of the symptoms.", "There is an underlying tension between the two departments."],
+  "confine": ["Please confine your remarks to the topic under discussion.", "The disease is largely confined to tropical regions."],
+  "undermine": ["Constant criticism can undermine a child's self-confidence.", "The scandal threatened to undermine public trust in the government."],
+  "degrade": ["Such rude behavior degrades the dignity of the office.", "Plastic waste takes centuries to degrade in the environment."],
+  "scar": ["The operation left a small scar on his knee.", "The accident left emotional scars that never fully healed."],
+  "constitute": ["Women constitute nearly half of the workforce in this industry.", "Twelve months constitute a year."],
+  "default": ["The company faced bankruptcy after repeated defaults on its loans.", "He was sued for default on the mortgage payments."],
+  "execution": ["The plan was brilliant, but its execution was poorly managed.", "The execution of the project took longer than expected."],
+  "clip": ["She fastened the papers together with a metal clip.", "We watched a short clip from the opening ceremony."],
+  "unify": ["The new leader hopes to unify the divided country.", "A common language helped unify the scattered communities."],
+  "rip": ["A small rip in the tent let in the cold night air.", "He noticed a rip in the seat of his trousers."],
+  "obedient": ["The obedient dog waited patiently by the gate.", "The students were obedient and followed every instruction."],
+  "luminous": ["The luminous hands of the clock glowed in the dark room.", "The luminous display of fireworks lit up the night sky."],
+  "quota": ["The government set a quota on imported steel.", "Each salesperson must meet a monthly quota to earn a bonus."],
+  "esthetic": ["The building was criticized for its lack of esthetic appeal.", "She studied the esthetic principles behind Japanese garden design."],
+  "shatter": ["The heavy rock shattered the window into tiny pieces.", "The unexpected defeat shattered the team's confidence."],
+  "evident": ["It was evident that she had been crying.", "The damage to the bridge was clearly evident after the storm."],
+  "heighten": ["The loud music only heightened the tension in the room.", "Regular exercise can heighten your awareness of your body."],
+  "profess": ["He professed his loyalty to the company in public.", "She professed to know nothing about the missing documents."],
+  "grip": ["She gripped the railing tightly as the train lurched forward.", "Panic began to grip the crowd as the fire spread."],
+  "upgrade": ["You can upgrade your ticket to first class at the counter.", "The city plans to upgrade the old subway system next year."],
+  "degenerate": ["The peaceful protest degenerated into violent rioting.", "His health degenerated rapidly after years of heavy drinking."],
+  "notify": ["Please notify the office if you will be absent tomorrow.", "The school will notify parents of any change in the schedule."],
+  "composite": ["The aircraft's wings are made from a lightweight composite.", "The police used a composite to help identify the suspect."],
+  "inhabit": ["Many rare species inhabit the remote mountain forests.", "Thousands of birds inhabit the cliffs along the coast."],
+  "fatal": ["The driver was lucky to escape the accident without fatal injuries.", "One fatal mistake cost the company its most valuable client."],
+  "overpass": ["We drove under the overpass to reach the other side of town.", "The new overpass reduced traffic jams at the intersection."],
+  "canvas": ["The artist stretched a fresh canvas over the wooden frame.", "The tent was made of thick waterproof canvas."],
+  "precede": ["A formal dinner usually precedes the award ceremony.", "Heavy rain often precedes a flood in this region."],
+  "uphold": ["The judge swore to uphold the law and protect justice.", "The committee decided to uphold the original decision."],
+  "upright": ["The soldiers stood upright in perfect formation.", "He is known as an upright man who never accepts bribes."],
+  "radical": ["The company needs radical change to survive in the market.", "The radical group called for an immediate end to the war."],
+  "formulate": ["The scientists formulated a new theory to explain the data.", "She carefully formulated her response before the interview."],
+  "sovereign": ["The sovereign addressed the nation on the eve of the festival.", "Each sovereign state has the right to govern its own affairs."],
+  "impose": ["The government decided to impose new taxes on luxury goods.", "She never wanted to impose her own ideas on the team."],
+  "skeleton": ["The archaeologists uncovered a complete dinosaur skeleton.", "Only a skeleton staff remained in the office during the holiday."],
+  "duplicate": ["Please duplicate the file and keep a backup copy.", "Researchers found it difficult to duplicate the original experiment's results."],
+  "characteristic": ["The artist painted in a style characteristic of the Renaissance.", "Rapid growth is characteristic of many technology companies."],
+  "exert": ["She had to exert great pressure to open the stuck window.", "Parents exert a powerful influence on their children's habits."],
+  "adjoin": ["The two buildings adjoin each other and share a common wall.", "Our garden adjoins a quiet public park."],
+  "consent": ["The doctor cannot operate without the patient's consent.", "The project will proceed only with the consent of all members."],
+  "generous": ["The millionaire made a generous donation to the local hospital.", "She is always generous with her time when friends need help."],
+  "snatch": ["A thief tried to snatch her handbag on the crowded street.", "He managed to snatch a few hours of sleep before the exam."],
+  "urge": ["The doctor urged him to quit smoking immediately.", "She urged the committee to make a decision before the deadline."],
+  "contradict": ["The witness's statement contradicts the driver's version of events.", "He is always contradicting his boss in meetings."],
+  "deport": ["The government decided to deport the illegal immigrants.", "He faces the possibility of being deported to his home country."],
+  "versus": ["Tonight's final is Brazil versus Germany.", "We weighed the benefits of city life versus the countryside."],
+  "orient": ["The museum has a fine collection of art from the Orient.", "Her research focuses on ancient trade routes between the West and the Orient."],
+  "owl": ["An owl hooted from the tree outside my window.", "Owls are nocturnal hunters that rarely appear during the day."],
+  "irony": ["The irony of the situation was that he missed the meeting about punctuality.", "She said \"What a lovely day\" with heavy irony as the rain poured down."],
+  "enroll": ["She decided to enroll in a course on modern Chinese literature.", "The university plans to enroll more international students next year."],
+  "constrain": ["Lack of funds constrained the project's scope.", "He felt constrained by the strict rules of the institution."],
+  "refreshment": ["Refreshments will be served during the coffee break.", "We stopped at a small cafe for light refreshments."],
+  "utmost": ["The safety of the passengers is of the utmost importance.", "She put the utmost effort into finishing the project on time."],
+  "vent": ["The kitchen vent removes smoke and cooking smells.", "Make sure the air vent is not blocked by furniture."],
+  "penguin": ["Penguins waddle awkwardly on land but swim with great speed.", "The penguin dived into the icy water to catch fish."],
+  "bronze": ["The museum displays a bronze statue from the Han dynasty.", "She won a bronze medal in the swimming competition."],
+  "for the sake of": ["They moved to the countryside for the sake of their children's health.", "For the sake of safety, please wear a helmet when cycling."],
+  "vacant": ["The apartment has been vacant for months after the tenants left.", "He stared at the wall with a vacant expression."],
+  "sensible": ["It is sensible to save money for unexpected expenses.", "Wearing a helmet while cycling is a sensible precaution."],
+  "illusion": ["The desert heat created the illusion of a lake in the distance.", "She labored under the illusion that she would win the contest easily."],
+  "authentic": ["The restaurant serves authentic Italian pasta made from scratch.", "Experts confirmed that the painting is an authentic Van Gogh."],
+  "boom": ["The technology sector is experiencing a boom in new projects.", "Online sales boom during the holiday shopping season."],
+  "deem": ["The board deemed the proposal too risky to approve.", "She was deemed the best candidate for the position."],
+  "rebel": ["Teenagers often rebel against their parents' rules.", "Some senators rebelled against the new tax policy."],
+  "mur": ["The old man would mur about the rising prices every morning.", "She began to mur quietly to herself when her request was refused."],
+  "patent": ["The company filed a patent for its new battery technology.", "He holds several patents for his inventions."],
+  "gasp": ["The audience gasped as the magician vanished from the stage.", "He was gasping for breath after running up the stairs."],
+  "spine": ["The cyclist injured his spine in the crash.", "A shiver ran down her spine when she heard the noise."],
+  "accessory": ["The shop sells phone cases and other accessories.", "A handbag is a practical accessory for most outfits."],
+  "furious": ["She was furious when she discovered the mistake.", "The furious manager demanded an immediate explanation."],
+  "masterpiece": ["The Mona Lisa is considered a masterpiece of Renaissance art.", "The novel is widely regarded as his finest masterpiece."],
+  "chorus": ["The whole class joined in the chorus of the song.", "The proposal met with a chorus of approval from the audience."],
+  "collide": ["Two cars collided on the icy highway this morning.", "His views collide with those of his colleagues on many issues."],
+  "drastic": ["The company took drastic measures to cut its losses.", "A drastic change in the weather surprised everyone."],
+  "dramatic": ["The film's dramatic ending left the audience speechless.", "There has been a dramatic increase in online sales."],
+  "intent": ["She had every intent to finish the project on time.", "He was so intent on his work that he ignored the noise."],
+  "petty": ["He was jailed for petty theft at the local market.", "Their petty arguments over money ruined the friendship."],
+  "brink": ["The company is on the brink of bankruptcy.", "She stood on the brink of the cliff, looking at the sea."],
+  "revenge": ["He swore to take revenge on those who betrayed him.", "The attack was an act of revenge for an earlier defeat."],
+  "resemblance": ["The child bears a striking resemblance to her mother.", "There is little resemblance between the two political parties."],
+  "pact": ["The two nations signed a peace pact last week.", "We made a pact to support each other through university."],
+  "rhythm": ["She tapped her foot to the rhythm of the song.", "Enough sleep helps maintain your body's natural rhythm."],
+  "blink": ["In a blink, the magician made the coin disappear.", "You should not blink when looking directly at the sun."],
+  "vein": ["The nurse found a suitable vein in his arm.", "He wrote several stories in a similar humorous vein."],
+  "comply": ["All drivers must comply with traffic regulations.", "The factory failed to comply with safety standards."],
+  "hop": ["The rabbit gave a quick hop across the garden.", "We can hop on the next train to the city."],
+  "auction": ["The painting was sold at auction for a record price.", "They plan to auction off the old furniture next month."],
+  "medium": ["Television remains a powerful medium for advertising.", "She ordered a medium pizza for the two of us."],
+  "equator": ["The equator divides the Earth into two hemispheres.", "Countries near the equator enjoy a hot, humid climate."],
+  "magnet": ["The strong magnet picked up all the paper clips.", "The city is a magnet for young professionals."],
+  "radius": ["The explosion was felt within a radius of ten miles.", "Draw a circle with a radius of five centimeters."],
+  "knob": ["She turned the knob and pushed the door open.", "The radio's volume knob is stuck and won't move."],
+  "obscure": ["The reason for his sudden resignation remains obscure.", "She enjoys collecting obscure facts about history."],
+  "migrate": ["Many birds migrate south before the winter arrives.", "Workers migrate to big cities in search of better jobs."],
+  "irrigation": ["The farmers rely on irrigation to water their crops.", "Modern irrigation systems have greatly increased food production."],
+  "velvet": ["She wore a beautiful velvet dress to the ceremony.", "The cat's fur felt as soft as velvet."],
+  "blaze": ["The fire began to blaze fiercely in the dry forest.", "The lights of the city blazed all through the night."],
+  "prevalent": ["This disease is prevalent among children in rural areas.", "Smartphones have become prevalent in every part of society."],
+  "commit": ["He refused to commit a crime even when threatened.", "We must commit ourselves to achieving the company's goals."],
+  "cycle": ["She cycles to work every day to stay fit.", "It takes him twenty minutes to cycle to the station."],
+  "circle": ["The children sat in a circle around the teacher.", "The plane circled the airport for nearly an hour."],
+  "clamp": ["Use a clamp to secure the board to the table.", "The mechanic clamped the broken pipe to stop the leak."],
+  "incidentally": ["Your brother, incidentally, was at the station yesterday.", "I should mention, incidentally, that the meeting has moved to Monday."],
+  "initiative": ["She took the initiative to organize a team meeting.", "The government launched a new initiative to reduce pollution."],
+  "perfume": ["She wore a delicate perfume that filled the room.", "The perfume of the roses drifted through the open window."],
+  "perspective": ["Traveling abroad gives you a new perspective on life.", "From a historical perspective, the event was significant."],
+  "ingenious": ["She came up with an ingenious solution to the problem.", "The engineer designed an ingenious device for saving water."],
+  "displace": ["The new technology may displace thousands of workers.", "The flood displaced many families from their homes."],
+  "alienate": ["His rude behavior began to alienate his closest friends.", "We should not alienate people with different opinions."],
+  "legend": ["The legend of the ancient king is still told today.", "The tennis player became a living legend in her country."],
+  "conceive": ["It is difficult to conceive of a world without electricity.", "The architect conceived an entirely new design for the museum."],
+  "productivity": ["Flexible working hours can improve employees' productivity.", "The factory's productivity rose sharply after the upgrade."],
+  "distill": ["The factory distills pure water from seawater.", "He distilled years of research into a single lecture."],
+  "readily": ["She readily agreed to help us with the project.", "The information is readily available on the website."],
+  "exceptional": ["Her exceptional talent was recognized by the judges.", "The team made an exceptional effort to meet the deadline."],
+  "scratch": ["Don't scratch the mosquito bites or they will get worse.", "The branch scratched my arm as I pushed through the bushes."],
+  "forum": ["The conference provided a forum for open discussion.", "She posted her question on an online forum."],
+  "hose": ["He used a garden hose to water the plants.", "The firefighters aimed the hose at the burning roof."],
+  "sheer": ["The rock face rises sheer for hundreds of meters.", "She finished the marathon through sheer determination."],
+  "verbal": ["The manager gave only verbal instructions to the staff.", "She has excellent verbal skills and speaks three languages."],
+  "pave": ["The workers will pave the road with new asphalt.", "His early experiments paved the way for modern medicine."],
+  "induce": ["The doctor used medicine to induce sleep in the patient.", "Advertising can induce people to buy things they do not need."],
+  "irrespective": ["The contest is open to all students irrespective of age.", "Everyone must follow the rules irrespective of their position."],
+  "bribe": ["He tried to bribe the official to speed up the process.", "The company offered a bribe to win the contract."],
+  "lever": ["Push the lever forward to start the machine.", "He used the lever to lift the heavy stone."],
+  "embed": ["The key was embedded in the sand near the beach.", "The video can be embedded directly in the web page."],
+  "verify": ["Please verify your email address before logging in.", "Scientists conducted experiments to verify the theory."],
+  "messenger": ["The messenger delivered the urgent letter within an hour.", "She works as a messenger for a local delivery company."],
+  "corporate": ["He works in the corporate finance department of a bank.", "The company's corporate strategy focuses on overseas expansion."],
+  "lofty": ["The leader's lofty ambitions were difficult to achieve.", "He spoke in a lofty tone that annoyed his colleagues."],
+  "verse": ["She memorized a verse from the poem for the recital.", "The song's first verse describes a lonely traveler."],
+  "repel": ["The soldiers managed to repel the enemy's attack.", "This spray can repel mosquitoes effectively."],
+  "set off": ["The savings should set off the cost of the repairs.", "We set off for the mountains before sunrise."],
+  "offset": ["The company planted trees to offset its carbon emissions.", "Higher wages offset the increase in food prices."],
+  "dispose": ["We must dispose of the old equipment before the move.", "The law requires hospitals to dispose of medical waste carefully."],
+  "lash": ["The strong wind lashed the trees during the storm.", "The driver lashed the horses to make them run faster."],
+  "intimidate": ["The bully tried to intimidate the younger students.", "She refused to be intimidated by the threats."],
+  "merge": ["The two companies announced plans to merge next year.", "The sky and sea seem to merge on the horizon."],
+  "gown": ["She wore an elegant evening gown to the ball.", "The doctor put on a surgical gown before the operation."],
+  "captive": ["The soldiers held the enemy captive for months.", "The audience was held captive by the speaker's story."],
+  "cocktail": ["He ordered a cocktail at the bar to celebrate.", "The party served a cocktail of fruit juices and soda."],
+  "nominate": ["They nominated her for the position of team leader.", "The film was nominated for three major awards."],
+  "poke": ["He poked a hole in the paper with his pencil.", "She poked me in the arm to get my attention."],
+};
+
+
 /* =====================================================================
    常量 / 工具
    ===================================================================== */
@@ -1308,9 +2329,12 @@ const DB_NAME = 'cet6_vocab_db';
 const DB_VERSION = 1;
 const PENDING_KEY = 'pendingNew';       // 未完成的新词学习会话（当天接着学用）
 const PENDING_REVIEW_KEY = 'pendingReview'; // 未完成的复习会话（当天接着复习用）
+const UNFAMILIAR_KEY = 'unfamiliarWords';    // "不熟悉"词池：在 List 总览 / 测验中点不熟悉，次日起加入复习
 
 let db = null;
 let session = null; // 当前学习/复习会话
+const favOpen = new Set(); // 收藏页当前已展开的 List 编号（页面刷新前保持）
+const listOpen = new Set(); // 学习页"List 单词总览"当前已展开的 List 编号
 
 /* ---------- IndexedDB 封装 ---------- */
 function openDB() {
@@ -1390,6 +2414,34 @@ function toast(msg) {
   t.classList.add('show');
   clearTimeout(toast._t);
   toast._t = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ---------- 例句（WORD_EXAMPLES 在数据区定义） ---------- */
+function getExamples(word) {
+  const ex = WORD_EXAMPLES[word];
+  return Array.isArray(ex) ? ex : [];
+}
+function exHTML(word) {
+  return getExamples(word).map(e => '<div class="example">' + esc(e) + '</div>').join('');
+}
+
+/* ---------- "不熟悉"词池：标记后次日加入复习 ---------- */
+async function getUnfamiliar() {
+  const raw = await getSetting(UNFAMILIAR_KEY);
+  try { const a = JSON.parse(raw); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+async function setUnfamiliar(list) { await setSetting(UNFAMILIAR_KEY, JSON.stringify(list)); }
+async function isUnfamiliar(word) { const l = await getUnfamiliar(); return l.some(u => u.w === word); }
+async function addUnfamiliar(word) {
+  const l = await getUnfamiliar();
+  if (!l.some(u => u.w === word)) { l.push({ w: word, t: todayISO() }); await setUnfamiliar(l); return true; }
+  return false;
+}
+async function removeUnfamiliar(word) {
+  const l = await getUnfamiliar();
+  const n = l.filter(u => u.w !== word);
+  if (n.length !== l.length) { await setUnfamiliar(n); return true; }
+  return false;
 }
 /* ============ 朗读 ============
    优先用"网易词典在线发音"（联网、发音标准、手机上任何浏览器都能出声），
@@ -1493,8 +2545,20 @@ async function listDoneToday(listIndex) {
 async function getReviewQueue() {
   const progs = await getAll('progress');
   const t = todayISO();
-  return progs.filter(p => p.stage >= 1 && p.nextReviewDate && p.nextReviewDate <= t)
-              .sort((a, b) => a.nextReviewDate < b.nextReviewDate ? -1 : 1);
+  const items = progs.filter(p => p.stage >= 1 && p.nextReviewDate && p.nextReviewDate <= t)
+              .sort((a, b) => a.nextReviewDate < b.nextReviewDate ? -1 : 1)
+              .map(p => ({ prog: p, extra: false }));
+  // 并入"不熟悉"词池中已到期（当天标记的次日才开始）的词，不影响其学习进度
+  const unfam = await getUnfamiliar();
+  for (const u of unfam) {
+    if (u.t && u.t >= t) continue; // 当天标记 → 明天才开始复习
+    if (items.some(it => it.prog.word === u.w)) continue;
+    const w = WORD_MAP[u.w];
+    let p = await get('progress', u.w);
+    if (!p) p = buildProgress({ word: u.w, list: w ? w.list : 0 });
+    items.push({ prog: p, extra: true });
+  }
+  return items;
 }
 // 每日统计
 async function recordDailyStats(newCount, reviewCount, correct, total) {
@@ -1536,6 +2600,8 @@ async function renderStudy() {
   const wk = '日一二三四五六'[d.getDay()];
   const today = todayISO();
   const reviewQ = await getReviewQueue();
+  const unfamList = await getUnfamiliar();
+  const unfamSet = new Set(unfamList.map(u => u.w));
   const learnedIdx = await computeLearnedIndex();
   const hasReview = reviewQ.length > 0;
   const pending = await loadPending();
@@ -1545,7 +2611,7 @@ async function renderStudy() {
 
   let reviewHTML;
   if (reviewQ.length) {
-    const chips = reviewQ.slice(0, 12).map(p => '<span class="chip">' + esc(p.word) + '</span>').join('');
+    const chips = reviewQ.slice(0, 12).map(it => '<span class="chip">' + esc(it.prog.word) + '</span>').join('');
     reviewHTML =
       '<div class="home-card">' +
         '<div class="home-card-head"><h3>📚 今日待复习</h3><span class="count-badge">' + reviewQ.length + ' 词</span></div>' +
@@ -1595,9 +2661,37 @@ async function renderStudy() {
     }
   }
 
+  // List 单词总览（学习页最下面）：展开每个 List 查看单词 + 例句，可点"不熟悉"加入次日复习
+  const overviewHTML =
+    '<div class="home-card">' +
+      '<div class="home-card-head"><h3>📋 List 单词总览</h3><span class="count-badge">' + RAW_WORDS.length + ' 个 List</span></div>' +
+      '<p class="sub">展开每个 List 查看单词 · 点"不熟悉"把它加入次日的复习</p>' +
+      RAW_WORDS.map((lst, i) => {
+        const l = i + 1;
+        const open = listOpen.has(l);
+        const rows = lst.words.map(w => {
+          const on = unfamSet.has(w.word);
+          return '<div class="ov-word">' +
+            '<div class="ov-head"><b>' + esc(w.word) + '</b>' +
+              '<button class="unfam-btn' + (on ? ' on' : '') + '" data-w="' + esc(w.word) + '">' + (on ? '✓ 已标记' : '不熟悉') + '</button></div>' +
+            '<div class="meaning">' + esc(w.meaning) + '</div>' +
+            exHTML(w.word) +
+          '</div>';
+        }).join('');
+        return '<div class="fav-group">' +
+          '<div class="fav-group-head" data-list="' + l + '">' +
+            '<b>List ' + l + '</b>' +
+            '<span class="count-badge">' + lst.words.length + ' 词</span>' +
+            '<span class="fav-group-arrow">' + (open ? '▾' : '▸') + '</span>' +
+          '</div>' +
+          '<div class="fav-group-body"' + (open ? '' : ' style="display:none"') + '>' + rows + '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+
   el.innerHTML =
     '<div class="page-head"><h1>今日学习</h1><p class="sub">' + (d.getMonth() + 1) + '月' + d.getDate() + '日 · 周' + wk + ' · List ' + Math.min(learnedIdx + 1, RAW_WORDS.length) + '/' + RAW_WORDS.length + '</p></div>' +
-    reviewHTML + newHTML +
+    reviewHTML + newHTML + overviewHTML +
     '<div class="home-tip">💡 艾宾浩斯间隔：1 → 2 → 4 → 7 → 15 天</div>';
 
   const rb = document.getElementById('startReviewBtn');
@@ -1608,6 +2702,25 @@ async function renderStudy() {
   if (rl) rl.addEventListener('click', () => startReplay(parseInt(rl.dataset.idx, 10), 'browse'));
   const rt = document.getElementById('retestBtn');
   if (rt) rt.addEventListener('click', () => startReplay(parseInt(rt.dataset.idx, 10), 'quiz'));
+
+  // 总览：展开/收起 List
+  el.querySelectorAll('.fav-group-head').forEach(h => h.addEventListener('click', () => {
+    const l = parseInt(h.dataset.list, 10);
+    if (listOpen.has(l)) listOpen.delete(l); else listOpen.add(l);
+    renderStudy();
+  }));
+  // 总览：标记 / 取消"不熟悉"
+  el.querySelectorAll('.unfam-btn').forEach(b => b.addEventListener('click', async () => {
+    const w = b.dataset.w;
+    if (await addUnfamiliar(w)) {
+      b.textContent = '✓ 已标记'; b.classList.add('on');
+      toast('已标记不熟悉，明天加入复习');
+    } else {
+      await removeUnfamiliar(w);
+      b.textContent = '不熟悉'; b.classList.remove('on');
+      toast('已取消标记');
+    }
+  }));
 }
 
 /* =====================================================================
@@ -1624,7 +2737,10 @@ async function savePending(s) {
     index: s.index,
     qIndex: s.qIndex || 0,
     correctCount: s.correctCount || 0,
-    answers: answers
+    answers: answers,
+    qOrder: s.qOrder,        // 测验乱序顺序（便于中断后接着测）
+    recallOrder: s.recallOrder, // 回忆轮顺序
+    rIndex: s.rIndex || 0
   }));
 }
 async function loadPending() {
@@ -1690,15 +2806,26 @@ async function startNewSession() {
     if (!queue.length) { await clearPending(); toast('本 List 已学完'); return; }
     const answers = pending.answers || {};
     queue.forEach(it => { const a = answers[it.w.word]; if (a) { it.answered = true; it.quizCorrect = !!a.c; } });
+    // 测验中途退出 → 按当时保存的乱序顺序继续，不重新打乱
+    if (pending.phase === 'quiz' && Array.isArray(pending.qOrder) && pending.qOrder.length) {
+      queue.sort((a, b) => pending.qOrder.indexOf(a.w.word) - pending.qOrder.indexOf(b.w.word));
+    }
     const correctCount = queue.filter(it => it.answered && it.quizCorrect).length;
     const index = Math.min(pending.index || 0, queue.length - 1);
-    let qIndex = Math.min(pending.qIndex || 0, queue.length);
-    session = { mode: 'new', listIndex: idx, queue: queue, index: index, phase: pending.phase, qIndex: qIndex, correctCount: correctCount };
+    const qIndex = Math.min(pending.qIndex || 0, queue.length);
+    session = { mode: 'new', listIndex: idx, queue: queue, index: index, phase: pending.phase, qIndex: qIndex, correctCount: correctCount, history: [] };
     showSession();
     if (session.phase === 'quiz') {
-      while (qIndex < queue.length && queue[qIndex].answered) qIndex++; // 跳过已答过的题
-      session.qIndex = qIndex;
-      if (qIndex >= queue.length) finishNew(); else renderQuiz();
+      let qi = qIndex;
+      while (qi < queue.length && queue[qi].answered) qi++; // 跳过已答过的题
+      session.qIndex = qi;
+      if (qi >= queue.length) startRecall(); else renderQuiz();
+    } else if (session.phase === 'recall') {
+      const ro = (Array.isArray(pending.recallOrder) && pending.recallOrder.length) ? pending.recallOrder : queue.map(it => it.w.word);
+      session.recallQueue = ro.map(word => WORD_MAP[word]).filter(Boolean);
+      session.rIndex = Math.min(pending.rIndex || 0, session.recallQueue.length - 1);
+      session.recallHistory = [];
+      renderRecall();
     } else {
       renderBrowse();
     }
@@ -1717,7 +2844,9 @@ async function startNewSession() {
 function showSession() {
   document.getElementById('sessionView').classList.remove('hidden');
   let title;
-  if (session.mode === 'new') title = '学习新词 · List ' + (session.listIndex + 1);
+  if (session.phase === 'recall') {
+    title = (session.mode === 'replay' ? '练习 · List ' : '学习新词 · List ') + (session.listIndex + 1) + ' · 回忆';
+  } else if (session.mode === 'new') title = '学习新词 · List ' + (session.listIndex + 1);
   else if (session.mode === 'replay') title = '练习 · List ' + (session.listIndex + 1);
   else title = '复习旧词 · ' + session.queue.length + ' 词';
   document.getElementById('sessionTitle').textContent = title;
@@ -1748,7 +2877,7 @@ function renderBrowse() {
       '<div class="word-big">' + esc(item.w.word) + '</div>' +
       (item.w.phonetic ? '<div class="phonetic">' + esc(item.w.phonetic) + '</div>' : '') +
       '<div class="meaning">' + esc(item.w.meaning) + '</div>' +
-      (item.w.example ? '<div class="example">' + esc(item.w.example) + '</div>' : '') +
+      exHTML(item.w.word) +
     '</div>' +
     '<button class="btn primary" id="browseBtn">' + (last ? '开始测验' : '下一个') + '</button>' +
     '<p class="hint">点击卡片可重新朗读</p>';
@@ -1779,6 +2908,11 @@ function startQuiz() {
   session.phase = 'quiz';
   session.qIndex = 0;
   session.correctCount = 0;
+  session.history = [];
+  // 乱序：每次开始测验都重新打乱，重新测试顺序也会不一样
+  session.queue = shuffle(session.queue);
+  session.qOrder = session.queue.map(it => it.w.word);
+  savePending(session);
   renderQuiz();
 }
 
@@ -1792,48 +2926,171 @@ function pickDistractors(wordStr, n) {
   return out;
 }
 
-function renderQuiz() {
+async function renderQuiz() {
   if (!session || session.phase !== 'quiz') return;
   const item = session.queue[session.qIndex];
   const total = session.queue.length;
   const correct = item.w.meaning;
+  const answered = !!item.answered;
+  const unfamNow = await isUnfamiliar(item.w.word);
   const options = shuffle([correct].concat(pickDistractors(item.w.word, 3)));
+  const canPrev = session.history && session.history.length > 0;
   const body = document.getElementById('sessionBody');
   body.innerHTML =
     '<div class="progress-row"><span>测验 ' + (session.qIndex + 1) + ' / ' + total + '</span>' +
       '<div class="bar"><div style="width:' + ((session.qIndex + 1) / total * 100).toFixed(1) + '%"></div></div></div>' +
     '<div class="quiz-head">' +
-      '<div class="word-big">' + esc(item.w.word) + '</div>' +
+      '<button class="star-btn" id="quizStarBtn">' + (item.prog.favorite ? '⭐' : '☆') + '</button>' +
+      '<div class="word-big" id="quizWord">' + esc(item.w.word) + '</div>' +
       (item.w.phonetic ? '<div class="phonetic">' + esc(item.w.phonetic) + '</div>' : '') +
+      '<button class="unfam-pill' + (unfamNow ? ' on' : '') + '" id="quizUnfamBtn">' + (unfamNow ? '✓ 已标记' : '不熟悉') + '</button>' +
     '</div>' +
     '<div class="options">' +
-      options.map(o => '<button class="opt">' + esc(o) + '</button>').join('') +
+      options.map(o => '<button class="opt" data-o="' + esc(o) + '"' + (answered ? ' disabled' : '') + '>' + esc(o) + '</button>').join('') +
+    '</div>' +
+    '<div class="row2" style="margin-top:14px">' +
+      '<button class="btn ghost" id="quizPrevBtn"' + (canPrev ? '' : ' disabled') + '>上一题</button>' +
+      '<button class="btn primary" id="quizNextBtn"' + (answered ? '' : ' disabled') + '>下一题</button>' +
     '</div>';
   speak(item.w.word);
+  // 点单词可重新朗读
+  document.getElementById('quizWord').addEventListener('click', () => speak(item.w.word));
+  document.getElementById('quizStarBtn').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    item.prog.favorite = !item.prog.favorite;
+    document.getElementById('quizStarBtn').textContent = item.prog.favorite ? '⭐' : '☆';
+    item.prog.updatedAt = Date.now();
+    await put('progress', item.prog);
+    toast(item.prog.favorite ? '已收藏 ⭐' : '已取消收藏');
+  });
+  // 不熟悉：加入次日复习 + 自动收藏
+  document.getElementById('quizUnfamBtn').addEventListener('click', async () => {
+    await addUnfamiliar(item.w.word);
+    if (!item.prog.favorite) { item.prog.favorite = true; item.prog.updatedAt = Date.now(); await put('progress', item.prog); }
+    const btn = document.getElementById('quizUnfamBtn');
+    btn.textContent = '✓ 已标记'; btn.classList.add('on');
+    toast('已标记不熟悉，明天复习并已收藏 ⭐');
+  });
 
   const btns = body.querySelectorAll('.opt');
-  let answered = false;
-  btns.forEach(b => b.addEventListener('click', () => {
-    if (answered) return;
-    answered = true;
-    const isCorrect = b.textContent === correct;
-    if (isCorrect) {
-      b.classList.add('right');
-      session.correctCount++;
-      item.quizCorrect = true;
-    } else {
-      b.classList.add('wrong');
-      btns.forEach(x => { if (x.textContent === correct) x.classList.add('right'); });
-    }
-    item.answered = true;
-    savePending(session); // 记录本次作答，中途退出后测验也能接续
-    setTimeout(() => {
-      session.qIndex++;
-      if (session.qIndex >= total) finishNew();
-      else renderQuiz();
-    }, 1000);
-  }));
+  if (!answered) {
+    btns.forEach(b => b.addEventListener('click', async () => {
+      if (item.answered) return;
+      item.answered = true;
+      const isCorrect = b.dataset.o === correct;
+      if (isCorrect) {
+        b.classList.add('right');
+        session.correctCount++;
+        item.quizCorrect = true;
+      } else {
+        b.classList.add('wrong');
+        btns.forEach(x => { if (x.dataset.o === correct) x.classList.add('right'); });
+        await autoFavoriteWord(item); // 选错 → 自动加入收藏夹
+      }
+      item.chosenWrong = isCorrect ? null : b.dataset.o;
+      btns.forEach(x => x.disabled = true);
+      document.getElementById('quizNextBtn').disabled = false;
+      savePending(session); // 记录本次作答，中途退出后测验也能接续
+    }));
+  } else {
+    // 回看已答题目：标出正确/错误答案，禁止再作答
+    btns.forEach(b => {
+      if (b.dataset.o === correct) b.classList.add('right');
+      else if (b.dataset.o === item.chosenWrong) b.classList.add('wrong');
+    });
+  }
+  document.getElementById('quizPrevBtn').addEventListener('click', quizPrev);
+  document.getElementById('quizNextBtn').addEventListener('click', quizNext);
   savePending(session); // 记录当前测验位置
+}
+
+/* 测验导航：上一题 / 下一题（用历史栈记录去过哪里） */
+function quizPrev() {
+  if (!session || !session.history || !session.history.length) { toast('已是第一题'); return; }
+  session.qIndex = session.history.pop();
+  savePending(session);
+  renderQuiz();
+}
+function quizNext() {
+  if (!session) return;
+  session.history.push(session.qIndex);
+  if (session.qIndex < session.queue.length - 1) {
+    session.qIndex++;
+  } else {
+    // 最后一题答完 → 自动进入纯英文回忆轮
+    startRecall();
+    return;
+  }
+  savePending(session);
+  renderQuiz();
+}
+
+/* ===== 回忆轮：测完 List 后自动再弹出，只显示英文，无选项、无中文，点卡片可重读 ===== */
+function startRecall() {
+  if (!session) return;
+  session.phase = 'recall';
+  session.rIndex = 0;
+  session.recallHistory = [];
+  // 乱序：重新打乱，每次测试顺序都不一样
+  session.recallQueue = shuffle(session.queue.map(it => it.w));
+  session.recallOrder = session.recallQueue.map(w => w.word);
+  savePending(session);
+  showSession(); // 更新标题为"回忆"
+  renderRecall();
+}
+async function renderRecall() {
+  if (!session || session.phase !== 'recall') return;
+  const words = session.recallQueue;
+  if (!words.length) { finishNew(); return; }
+  const total = words.length;
+  const w = words[session.rIndex];
+  const canPrev = session.recallHistory && session.recallHistory.length > 0;
+  const body = document.getElementById('sessionBody');
+  body.innerHTML =
+    '<div class="progress-row"><span>回忆 ' + (session.rIndex + 1) + ' / ' + total + '</span>' +
+      '<div class="bar"><div style="width:' + ((session.rIndex + 1) / total * 100).toFixed(1) + '%"></div></div></div>' +
+    '<div class="card big-card" id="recallCard">' +
+      '<div class="word-big" id="recallWord">' + esc(w.word) + '</div>' +
+      (w.phonetic ? '<div class="phonetic">' + esc(w.phonetic) + '</div>' : '') +
+    '</div>' +
+    '<p class="hint">回想这个词的意思后点下一个 · 点卡片可重新朗读</p>' +
+    '<div class="row2" style="margin-top:14px">' +
+      '<button class="btn ghost" id="recallPrevBtn"' + (canPrev ? '' : ' disabled') + '>上一个</button>' +
+      '<button class="btn primary" id="recallNextBtn">' + (session.rIndex === total - 1 ? '完成' : '下一个') + '</button>' +
+    '</div>';
+  speak(w.word);
+  document.getElementById('recallCard').addEventListener('click', () => speak(w.word));
+  document.getElementById('recallWord').addEventListener('click', () => speak(w.word));
+  document.getElementById('recallPrevBtn').addEventListener('click', recallPrev);
+  document.getElementById('recallNextBtn').addEventListener('click', recallNext);
+  savePending(session);
+}
+function recallPrev() {
+  if (!session || !session.recallHistory || !session.recallHistory.length) { toast('已是第一个'); return; }
+  session.rIndex = session.recallHistory.pop();
+  savePending(session);
+  renderRecall();
+}
+function recallNext() {
+  if (!session) return;
+  session.recallHistory.push(session.rIndex);
+  if (session.rIndex < session.recallQueue.length - 1) {
+    session.rIndex++;
+  } else {
+    finishNew(); // 回忆轮结束 → 出成绩
+    return;
+  }
+  savePending(session);
+  renderRecall();
+}
+
+// 测验选错意思 → 自动把该单词加入收藏夹（重复错 / 已收藏则不重复提示）
+async function autoFavoriteWord(item) {
+  if (!item || !item.prog || item.prog.favorite) return;
+  item.prog.favorite = true;
+  item.prog.updatedAt = Date.now();
+  await put('progress', item.prog);
+  toast('已自动收藏 ⭐');
 }
 
 async function finishNew() {
@@ -1890,22 +3147,22 @@ async function startReviewSession() {
   // 当天有未完成复习 → 接着复习，而不是从头再来
   const pending = await loadPendingReview();
   if (pending && pending.order && pending.order.length) {
-    const progMap = {}; queue.forEach(p => { progMap[p.word] = p; });
+    const progMap = {}; queue.forEach(it => { progMap[it.prog.word] = it; });
     const items = [];
     pending.order.forEach(word => {
-      const prog = progMap[word];
-      if (!prog) return; // 该词已不在今日待复习队列（异常情况），跳过
+      const it = progMap[word];
+      if (!it) return; // 该词已不在今日待复习队列（异常情况），跳过
       const a = pending.answers[word];
-      items.push({ prog: prog, answered: a === 'y' ? true : (a === 'n' ? false : null) });
+      items.push({ prog: it.prog, extra: it.extra, answered: a === 'y' ? true : (a === 'n' ? false : null) });
     });
-    queue.forEach(p => { if (!pending.order.includes(p.word)) items.push({ prog: p, answered: null }); });
+    queue.forEach(it => { if (!pending.order.includes(it.prog.word)) items.push({ prog: it.prog, extra: it.extra, answered: null }); });
     if (items.length) {
       let index = Math.min(pending.index || 0, items.length - 1);
       while (index < items.length && items[index].answered !== null) index++; // 跳过已答过的词
       session = {
         mode: 'review', queue: items, index: index,
         correctCount: pending.correctCount || 0, wrongCount: pending.wrongCount || 0,
-        phase: 'card'
+        phase: 'card', history: []
       };
       showSession();
       if (index >= items.length) { finishReview(); return; } // 全部已答完，直接出结果
@@ -1917,9 +3174,9 @@ async function startReviewSession() {
 
   session = {
     mode: 'review',
-    queue: queue.map(p => ({ prog: p, answered: null })),
+    queue: queue.map(it => ({ prog: it.prog, extra: it.extra, answered: null })),
     index: 0, correctCount: 0, wrongCount: 0,
-    phase: 'card'
+    phase: 'card', history: []
   };
   showSession();
   renderReview();
@@ -1939,7 +3196,7 @@ async function startReplay(listIndex, startPhase) {
   }
   session = { mode: 'replay', listIndex: listIndex, queue: queue, index: 0, qIndex: 0, correctCount: 0, phase: startPhase };
   showSession();
-  if (startPhase === 'quiz') renderQuiz(); else renderBrowse();
+  if (startPhase === 'quiz') startQuiz(); else renderBrowse();
 }
 
 function renderReview() {
@@ -1948,7 +3205,8 @@ function renderReview() {
   const w = WORD_MAP[item.prog.word];
   if (!w) { nextWord(); return; }
   const total = session.queue.length;
-  const revealed = item.answered === false;
+  const revealed = item.answered === true || item.answered === false; // 已作答 → 显示释义
+  const canPrev = session.history && session.history.length > 0;
   const body = document.getElementById('sessionBody');
   body.innerHTML =
     '<div class="progress-row"><span>复习 ' + (session.index + 1) + ' / ' + total + '</span>' +
@@ -1957,11 +3215,13 @@ function renderReview() {
       '<button class="star-btn" id="starBtn">' + (item.prog.favorite ? '⭐' : '☆') + '</button>' +
       '<div class="word-big">' + esc(w.word) + '</div>' +
       (w.phonetic ? '<div class="phonetic">' + esc(w.phonetic) + '</div>' : '') +
-      (revealed ? '<div class="meaning">' + esc(w.meaning) + '</div>' + (w.example ? '<div class="example">' + esc(w.example) + '</div>' : '') : '') +
+      (item.extra ? '<p class="hint" style="margin-top:8px;color:#007AFF;font-weight:600">不熟悉词 · 认识后自动移出</p>' : '') +
+      (revealed ? '<div class="meaning">' + esc(w.meaning) + '</div>' + exHTML(w.word) : '') +
     '</div>' +
     (revealed
-      ? '<button class="btn primary" id="nextBtn">下一词</button>'
-      : '<div class="row2"><button class="btn yes" id="knowBtn">认识 ✓</button><button class="btn no" id="noBtn">不认识 ✗</button></div>') +
+      ? '<div class="row2" style="margin-top:14px"><button class="btn ghost" id="prevBtn"' + (canPrev ? '' : ' disabled') + '>上一个</button><button class="btn primary" id="nextBtn">下一词</button></div>'
+      : '<div class="row2"><button class="btn ghost" id="prevBtn"' + (canPrev ? '' : ' disabled') + '>上一个</button><button class="btn yes" id="knowBtn">认识 ✓</button></div>' +
+        '<button class="btn no" id="noBtn" style="margin-top:12px">不认识 ✗</button>') +
     '<p class="hint">' + (revealed ? '' : '点击卡片可重新朗读') + '</p>';
   speak(w.word);
 
@@ -1974,24 +3234,34 @@ function renderReview() {
     toast(item.prog.favorite ? '已收藏 ⭐' : '已取消收藏');
   });
   document.getElementById('scard').addEventListener('click', () => speak(w.word));
+  document.getElementById('prevBtn').addEventListener('click', prevReviewWord);
 
   clearTimeout(session._t);
   if (revealed) {
-    session._t = setTimeout(nextWord, 1500); // 延迟 1.5 秒自动继续
     document.getElementById('nextBtn').addEventListener('click', nextWord);
   } else {
-    document.getElementById('knowBtn').addEventListener('click', () => { item.answered = true; session.correctCount++; nextWord(); });
-    document.getElementById('noBtn').addEventListener('click', () => { item.answered = false; session.wrongCount++; renderReview(); });
+    document.getElementById('knowBtn').addEventListener('click', () => { item.answered = true; session.correctCount++; savePendingReview(session); nextWord(); });
+    document.getElementById('noBtn').addEventListener('click', () => { item.answered = false; session.wrongCount++; savePendingReview(session); renderReview(); });
   }
   savePendingReview(session); // 记录复习进度，中途退出可继续
+}
+
+function prevReviewWord() {
+  clearTimeout(session._t);
+  if (!session || !session.history || !session.history.length) { toast('已是第一个'); return; }
+  session.index = session.history.pop();
+  savePendingReview(session);
+  renderReview();
 }
 
 function nextWord() {
   clearTimeout(session._t);
   if (!session) return;
+  session.history = session.history || [];
+  session.history.push(session.index);
   session.index++;
   if (session.index >= session.queue.length) finishReview();
-  else renderReview();
+  else { savePendingReview(session); renderReview(); }
 }
 
 async function finishReview() {
@@ -2010,6 +3280,11 @@ async function finishReview() {
   for (const it of session.queue) {
     const p = it.prog;
     const w = WORD_MAP[p.word];
+    // "不熟悉"词：只更新不熟悉池（认识 → 移出；不认识 → 保留，明日继续复习），不动学习进度
+    if (it.extra) {
+      if (it.answered === true) await removeUnfamiliar(p.word);
+      continue;
+    }
     const lastExp = p.lastReviewDate || p.learnedDate;
     const d = lastExp ? daysBetween(lastExp, today) : 0;
     p.reviews = p.reviews || [];
@@ -2028,6 +3303,8 @@ async function finishReview() {
     }
     p.updatedAt = Date.now();
     await put('progress', p);
+    // 认识后若仍在"不熟悉"池，一并清除（可能之前标记过）
+    if (it.answered === true) await removeUnfamiliar(p.word);
   }
   await recordDailyStats(0, total, correct, total);
 
@@ -2052,25 +3329,58 @@ async function finishReview() {
    ===================================================================== */
 async function renderFav() {
   const el = document.getElementById('page-fav');
-  const progs = (await getAll('progress')).filter(p => p.favorite).sort((a, b) => a.word.localeCompare(b.word));
+  const progs = (await getAll('progress')).filter(p => p.favorite);
   if (!progs.length) {
     el.innerHTML = '<div class="page-head"><h1>收藏</h1></div>' +
-      '<div class="empty">还没有收藏的单词 🐣<br><span class="sub">学习 / 复习时点击卡片右上角 ☆ 即可收藏</span></div>';
+      '<div class="empty">还没有收藏的单词 🐣<br><span class="sub">测验答错会自动收藏，或学习 / 复习时点击卡片右上角 ☆ 手动收藏</span></div>';
     return;
   }
-  el.innerHTML = '<div class="page-head"><h1>收藏 <span class="count-badge">' + progs.length + '</span></h1></div>' +
-    progs.map(p => {
-      const w = WORD_MAP[p.word];
-      if (!w) return '';
-      return '<div class="fav-item">' +
-        '<div class="fav-head">' +
-          '<div><b class="word">' + esc(w.word) + '</b>' + (w.phonetic ? ' <span class="phonetic">' + esc(w.phonetic) + '</span>' : '') + '</div>' +
-          '<button class="unfav" data-w="' + esc(w.word) + '">取消收藏</button>' +
-        '</div>' +
-        '<div class="meaning">' + esc(w.meaning) + '</div>' +
-        (w.example ? '<div class="example">' + esc(w.example) + '</div>' : '') +
-      '</div>';
-    }).join('');
+  // 按所属 List 分组（同一 List 的单词折叠在一起）
+  const groups = {}; // list 编号 -> [{ p, w }]
+  progs.forEach(p => {
+    const w = WORD_MAP[p.word];
+    if (!w) return;
+    const l = w.list || 0;
+    (groups[l] = groups[l] || []).push({ p: p, w: w });
+  });
+  const listNums = Object.keys(groups).map(Number).sort((a, b) => a - b);
+  const total = progs.length;
+
+  let html = '<div class="page-head"><h1>收藏 <span class="count-badge">' + total + '</span></h1></div>' +
+    '<p class="sub">点击 List 标题可展开 / 收起该组的收藏单词</p>';
+  listNums.forEach(l => {
+    const items = groups[l];
+    const open = favOpen.has(l);
+    html += '<div class="fav-group' + (open ? ' open' : '') + '">' +
+      '<div class="fav-group-head" data-list="' + l + '">' +
+        '<b>List ' + l + '</b>' +
+        '<span class="count-badge">' + items.length + ' 词</span>' +
+        '<span class="fav-group-arrow">' + (open ? '▾' : '▸') + '</span>' +
+      '</div>' +
+      '<div class="fav-group-body"' + (open ? '' : ' style="display:none"') + '>' +
+        items.map(it => {
+          const w = it.w;
+          return '<div class="fav-item">' +
+            '<div class="fav-head">' +
+              '<div><b class="word">' + esc(w.word) + '</b>' + (w.phonetic ? ' <span class="phonetic">' + esc(w.phonetic) + '</span>' : '') +
+                '<span class="list-tag">List ' + l + '</span></div>' +
+              '<button class="unfav" data-w="' + esc(w.word) + '">取消收藏</button>' +
+            '</div>' +
+            '<div class="meaning">' + esc(w.meaning) + '</div>' +
+            exHTML(w.word) +
+          '</div>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+  });
+  el.innerHTML = html;
+
+  // 点 List 标题展开 / 收起该组
+  el.querySelectorAll('.fav-group-head').forEach(h => h.addEventListener('click', () => {
+    const l = parseInt(h.dataset.list, 10);
+    if (favOpen.has(l)) favOpen.delete(l); else favOpen.add(l);
+    renderFav();
+  }));
   el.querySelectorAll('.unfav').forEach(b => b.addEventListener('click', async () => {
     const p = await get('progress', b.dataset.w);
     if (p) { p.favorite = false; p.updatedAt = Date.now(); await put('progress', p); }
