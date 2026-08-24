@@ -192,7 +192,7 @@ body{
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* ===================== List 单词总览（学习页底部） ===================== */
+/* ===================== 单词卡片（全屏 List 查看 / 测验结果共用） ===================== */
 .ov-word{background:#F9F9F9;border-radius:14px;padding:12px 14px;margin:10px 0}
 .ov-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ov-head b{font-size:17px;flex-shrink:0}
@@ -204,6 +204,22 @@ body{
 .unfam-btn.on{background:rgba(52,199,89,.15);color:#1E8E3E}
 .unfam-btn:active{opacity:.8}
 
+/* ===================== 单词总览页（统计旁边） ===================== */
+.lst-row{background:#fff;border-radius:20px;box-shadow:0 4px 12px rgba(0,0,0,.05);margin-bottom:12px;padding:16px;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;-webkit-user-select:none}
+.lst-row:active{opacity:.85}
+.lst-ico{width:44px;height:44px;border-radius:12px;background:rgba(0,122,255,.12);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.lst-info{flex:1;min-width:0}
+.lst-info b{font-size:17px;display:block}
+.lst-info .sub{margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lst-arrow{color:#C7C7CC;font-size:22px;flex-shrink:0}
+
+/* ===================== 单词全屏列表 ===================== */
+#listView{position:fixed;inset:0;z-index:90;background:#F2F2F7;display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 20px)}
+#listTop{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+#listClose{width:44px;height:44px;border:none;background:transparent;font-size:20px;color:#8E8E93;border-radius:50%;cursor:pointer}
+#listTitle{font-size:15px;font-weight:600;color:#3C3C43}
+#listBody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
 /* ===================== 测验：不熟悉按钮 ===================== */
 .unfam-pill{display:block;margin:12px auto 0;height:32px;padding:0 16px;border-radius:16px;border:none;background:#FFEBEA;color:#FF3B30;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
 .unfam-pill.on{background:rgba(52,199,89,.15);color:#1E8E3E}
@@ -214,6 +230,7 @@ body{
   <main id="pages">
     <section class="page active" id="page-study"></section>
     <section class="page" id="page-stats"></section>
+    <section class="page" id="page-lists"></section>
     <section class="page" id="page-fav"></section>
     <section class="page" id="page-mine"></section>
   </main>
@@ -221,6 +238,7 @@ body{
   <nav id="tabbar">
     <button class="tab active" data-page="study"><span class="ico">📖</span><span>学习</span></button>
     <button class="tab" data-page="stats"><span class="ico">📊</span><span>统计</span></button>
+    <button class="tab" data-page="lists"><span class="ico">📋</span><span>单词</span></button>
     <button class="tab" data-page="fav"><span class="ico">❤️</span><span>收藏</span></button>
     <button class="tab" data-page="mine"><span class="ico">⚙️</span><span>我的</span></button>
   </nav>
@@ -232,6 +250,15 @@ body{
       <span style="width:44px"></span>
     </div>
     <div id="sessionBody"></div>
+  </div>
+
+  <div id="listView" class="hidden">
+    <div id="listTop">
+      <button id="listClose">←</button>
+      <span id="listTitle"></span>
+      <span style="width:44px"></span>
+    </div>
+    <div id="listBody"></div>
   </div>
 
   <div id="toast"></div>
@@ -2334,7 +2361,6 @@ const UNFAMILIAR_KEY = 'unfamiliarWords';    // "不熟悉"词池：在 List 总
 let db = null;
 let session = null; // 当前学习/复习会话
 const favOpen = new Set(); // 收藏页当前已展开的 List 编号（页面刷新前保持）
-const listOpen = new Set(); // 学习页"List 单词总览"当前已展开的 List 编号
 
 /* ---------- IndexedDB 封装 ---------- */
 function openDB() {
@@ -2585,11 +2611,12 @@ function bindTabs() {
     showPage(page);
     if (page === 'study') renderStudy();
     if (page === 'stats') renderStats();
+    if (page === 'lists') renderLists();
     if (page === 'fav') renderFav();
     if (page === 'mine') renderMine();
   }));
 }
-function refreshAll() { renderStudy(); renderFav(); renderStats(); renderMine(); }
+function refreshAll() { renderStudy(); renderLists(); renderFav(); renderStats(); renderMine(); }
 
 /* =====================================================================
    学习页
@@ -2600,8 +2627,6 @@ async function renderStudy() {
   const wk = '日一二三四五六'[d.getDay()];
   const today = todayISO();
   const reviewQ = await getReviewQueue();
-  const unfamList = await getUnfamiliar();
-  const unfamSet = new Set(unfamList.map(u => u.w));
   const learnedIdx = await computeLearnedIndex();
   const hasReview = reviewQ.length > 0;
   const pending = await loadPending();
@@ -2661,37 +2686,9 @@ async function renderStudy() {
     }
   }
 
-  // List 单词总览（学习页最下面）：展开每个 List 查看单词 + 例句，可点"不熟悉"加入次日复习
-  const overviewHTML =
-    '<div class="home-card">' +
-      '<div class="home-card-head"><h3>📋 List 单词总览</h3><span class="count-badge">' + RAW_WORDS.length + ' 个 List</span></div>' +
-      '<p class="sub">展开每个 List 查看单词 · 点"不熟悉"把它加入次日的复习</p>' +
-      RAW_WORDS.map((lst, i) => {
-        const l = i + 1;
-        const open = listOpen.has(l);
-        const rows = lst.words.map(w => {
-          const on = unfamSet.has(w.word);
-          return '<div class="ov-word">' +
-            '<div class="ov-head"><b>' + esc(w.word) + '</b>' +
-              '<button class="unfam-btn' + (on ? ' on' : '') + '" data-w="' + esc(w.word) + '">' + (on ? '✓ 已标记' : '不熟悉') + '</button></div>' +
-            '<div class="meaning">' + esc(w.meaning) + '</div>' +
-            exHTML(w.word) +
-          '</div>';
-        }).join('');
-        return '<div class="fav-group">' +
-          '<div class="fav-group-head" data-list="' + l + '">' +
-            '<b>List ' + l + '</b>' +
-            '<span class="count-badge">' + lst.words.length + ' 词</span>' +
-            '<span class="fav-group-arrow">' + (open ? '▾' : '▸') + '</span>' +
-          '</div>' +
-          '<div class="fav-group-body"' + (open ? '' : ' style="display:none"') + '>' + rows + '</div>' +
-        '</div>';
-      }).join('') +
-    '</div>';
-
   el.innerHTML =
     '<div class="page-head"><h1>今日学习</h1><p class="sub">' + (d.getMonth() + 1) + '月' + d.getDate() + '日 · 周' + wk + ' · List ' + Math.min(learnedIdx + 1, RAW_WORDS.length) + '/' + RAW_WORDS.length + '</p></div>' +
-    reviewHTML + newHTML + overviewHTML +
+    reviewHTML + newHTML +
     '<div class="home-tip">💡 艾宾浩斯间隔：1 → 2 → 4 → 7 → 15 天</div>';
 
   const rb = document.getElementById('startReviewBtn');
@@ -2703,14 +2700,55 @@ async function renderStudy() {
   const rt = document.getElementById('retestBtn');
   if (rt) rt.addEventListener('click', () => startReplay(parseInt(rt.dataset.idx, 10), 'quiz'));
 
-  // 总览：展开/收起 List
-  el.querySelectorAll('.fav-group-head').forEach(h => h.addEventListener('click', () => {
-    const l = parseInt(h.dataset.list, 10);
-    if (listOpen.has(l)) listOpen.delete(l); else listOpen.add(l);
-    renderStudy();
-  }));
-  // 总览：标记 / 取消"不熟悉"
-  el.querySelectorAll('.unfam-btn').forEach(b => b.addEventListener('click', async () => {
+}
+
+/* =====================================================================
+   单词总览页（统计旁边）：列出所有 List，点击进入全屏查看
+   ===================================================================== */
+async function renderLists() {
+  const el = document.getElementById('page-lists');
+  const unfam = await getUnfamiliar();
+  const unfamSet = new Set(unfam.map(u => u.w));
+  const progs = await getAll('progress');
+  const pMap = {}; progs.forEach(p => { pMap[p.word] = p; });
+  const rows = RAW_WORDS.map((lst, i) => {
+    const l = i + 1;
+    const learned = lst.words.filter(w => { const p = pMap[w.word]; return p && p.stage >= 1; }).length;
+    const unfamCount = lst.words.filter(w => unfamSet.has(w.word)).length;
+    return '<div class="lst-row" data-list="' + l + '">' +
+      '<div class="lst-ico">📋</div>' +
+      '<div class="lst-info"><b>List ' + l + '</b>' +
+        '<span class="sub">' + lst.words.length + ' 词' +
+          (learned ? ' · 已学 ' + learned + ' 词' : '') +
+          (unfamCount ? ' · 不熟悉 ' + unfamCount + ' 词' : '') +
+        '</span></div>' +
+      '<span class="lst-arrow">›</span>' +
+    '</div>';
+  }).join('');
+  el.innerHTML =
+    '<div class="page-head"><h1>单词总览</h1><p class="sub">' + RAW_WORDS.length + ' 个 List · ' + ALL_WORDS.length + ' 词 · 点击 List 全屏查看</p></div>' +
+    rows;
+  el.querySelectorAll('.lst-row').forEach(r => r.addEventListener('click', () => openListDetail(parseInt(r.dataset.list, 10) - 1)));
+}
+
+// 全屏查看某个 List 的全部单词，可标记"不熟悉"
+async function openListDetail(listIndex) {
+  const lst = RAW_WORDS[listIndex];
+  if (!lst) return;
+  const unfam = await getUnfamiliar();
+  const unfamSet = new Set(unfam.map(u => u.w));
+  document.getElementById('listTitle').textContent = 'List ' + (listIndex + 1) + ' · ' + lst.words.length + ' 词';
+  const body = document.getElementById('listBody');
+  body.innerHTML = lst.words.map(w => {
+    const on = unfamSet.has(w.word);
+    return '<div class="ov-word">' +
+      '<div class="ov-head"><b>' + esc(w.word) + '</b>' +
+        '<button class="unfam-btn' + (on ? ' on' : '') + '" data-w="' + esc(w.word) + '">' + (on ? '✓ 已标记' : '不熟悉') + '</button></div>' +
+      '<div class="meaning">' + esc(w.meaning) + '</div>' +
+      exHTML(w.word) +
+    '</div>';
+  }).join('');
+  body.querySelectorAll('.unfam-btn').forEach(b => b.addEventListener('click', async () => {
     const w = b.dataset.w;
     if (await addUnfamiliar(w)) {
       b.textContent = '✓ 已标记'; b.classList.add('on');
@@ -2721,6 +2759,10 @@ async function renderStudy() {
       toast('已取消标记');
     }
   }));
+  document.getElementById('listView').classList.remove('hidden');
+}
+function closeListDetail() {
+  document.getElementById('listView').classList.add('hidden');
 }
 
 /* =====================================================================
@@ -3764,6 +3806,7 @@ document.getElementById('sessionClose').addEventListener('click', () => {
   if (session && session.phase !== 'result' && !confirm('退出后进度已保留，下次点"继续"接着学，确定退出？')) return;
   closeSession();
 });
+document.getElementById('listClose').addEventListener('click', closeListDetail);
 
 // 清理残留的脏进度数据，避免统计 / 日历 / 复习被污染：
 //  1) 单词已不在词库（孤儿记录）
@@ -3785,6 +3828,7 @@ async function init() {
   await cleanupOrphanProgress();
   bindTabs();
   await renderStudy();
+  renderLists();
   renderFav();
   renderStats();
   renderMine();
