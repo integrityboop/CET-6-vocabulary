@@ -97,7 +97,7 @@ body{
 #sessionTop{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 #sessionClose{width:44px;height:44px;border:none;background:transparent;font-size:20px;color:#8E8E93;border-radius:50%;cursor:pointer}
 #sessionTitle{font-size:15px;font-weight:600;color:#3C3C43}
-#sessionBody{flex:1;display:flex;flex-direction:column}
+#sessionBody{flex:1;display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch}
 #sessionBody .btn{margin-top:14px}
 
 /* 测验 */
@@ -169,6 +169,11 @@ body{
 .ck-on{background:rgba(0,122,255,.85);color:#fff;font-weight:700}
 .ck-future{background:transparent;color:#D1D1D6}
 .ck-empty{background:transparent;pointer-events:none}
+.ck-nav{display:flex;align-items:center;justify-content:space-between;margin-top:14px}
+.ck-nav button{height:34px;padding:0 14px;border:none;border-radius:17px;background:rgba(0,122,255,.12);color:#007AFF;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.ck-nav button:active{opacity:.8}
+.ck-nav button:disabled{opacity:.35}
+.ck-nav span{font-size:15px;font-weight:700}
 
 /* ===================== 我的页 ===================== */
 .mine-head{display:flex;align-items:center;gap:14px}
@@ -2767,8 +2772,10 @@ async function openListDetail(listIndex) {
       toast('已标记不熟悉，明天复习并已收藏 ⭐');
     } else {
       await removeUnfamiliar(w);
+      const p = await get('progress', w);
+      if (p && p.favorite) { p.favorite = false; p.updatedAt = Date.now(); await put('progress', p); }
       b.textContent = '不熟悉'; b.classList.remove('on');
-      toast('已取消标记');
+      toast('已取消标记，并移出收藏');
     }
   }));
   document.getElementById('listView').classList.remove('hidden');
@@ -2951,16 +2958,24 @@ async function renderBrowse() {
     document.getElementById('starBtn').textContent = item.prog.favorite ? '⭐' : '☆';
     item.prog.updatedAt = Date.now();
     await put('progress', item.prog);
+    if (!item.prog.favorite) await removeUnfamiliar(item.w.word); // 取消收藏 → 同步移出"不熟悉"池
     toast(item.prog.favorite ? '已收藏 ⭐' : '已取消收藏');
   });
   document.getElementById('scard').addEventListener('click', () => speak(item.w.word));
-  // 浏览时也能标记"不熟悉"：加入次日复习 + 自动收藏（与测验一致）
+  // 浏览时也能标记 / 取消"不熟悉"：标记=加入次日复习+自动收藏；取消=移出池并同步移出收藏
   document.getElementById('unfamBtn').addEventListener('click', async () => {
-    await addUnfamiliar(item.w.word);
-    if (!item.prog.favorite) { item.prog.favorite = true; item.prog.updatedAt = Date.now(); await put('progress', item.prog); }
     const btn = document.getElementById('unfamBtn');
-    btn.textContent = '✓ 已标记'; btn.classList.add('on');
-    toast('已标记不熟悉，明天复习并已收藏 ⭐');
+    if (await isUnfamiliar(item.w.word)) {
+      await removeUnfamiliar(item.w.word);
+      if (item.prog.favorite) { item.prog.favorite = false; item.prog.updatedAt = Date.now(); await put('progress', item.prog); }
+      btn.textContent = '不熟悉'; btn.classList.remove('on');
+      toast('已取消标记，并移出收藏');
+    } else {
+      await addUnfamiliar(item.w.word);
+      if (!item.prog.favorite) { item.prog.favorite = true; item.prog.updatedAt = Date.now(); await put('progress', item.prog); }
+      btn.textContent = '✓ 已标记'; btn.classList.add('on');
+      toast('已标记不熟悉，明天复习并已收藏 ⭐');
+    }
   });
   document.getElementById('prevBtn').addEventListener('click', () => { if (session.index > 0) { session.index--; renderBrowse(); } });
   document.getElementById('nextBtn').addEventListener('click', () => {
@@ -3051,15 +3066,23 @@ async function renderQuiz() {
     document.getElementById('quizStarBtn').textContent = item.prog.favorite ? '⭐' : '☆';
     item.prog.updatedAt = Date.now();
     await put('progress', item.prog);
+    if (!item.prog.favorite) await removeUnfamiliar(item.w.word); // 取消收藏 → 同步移出"不熟悉"池
     toast(item.prog.favorite ? '已收藏 ⭐' : '已取消收藏');
   });
-  // 不熟悉：加入次日复习 + 自动收藏
+  // 不熟悉：可标记 / 取消。标记=加入次日复习+自动收藏；取消=移出池并同步移出收藏
   document.getElementById('quizUnfamBtn').addEventListener('click', async () => {
-    await addUnfamiliar(item.w.word);
-    if (!item.prog.favorite) { item.prog.favorite = true; item.prog.updatedAt = Date.now(); await put('progress', item.prog); }
     const btn = document.getElementById('quizUnfamBtn');
-    btn.textContent = '✓ 已标记'; btn.classList.add('on');
-    toast('已标记不熟悉，明天复习并已收藏 ⭐');
+    if (await isUnfamiliar(item.w.word)) {
+      await removeUnfamiliar(item.w.word);
+      if (item.prog.favorite) { item.prog.favorite = false; item.prog.updatedAt = Date.now(); await put('progress', item.prog); }
+      btn.textContent = '不熟悉'; btn.classList.remove('on');
+      toast('已取消标记，并移出收藏');
+    } else {
+      await addUnfamiliar(item.w.word);
+      if (!item.prog.favorite) { item.prog.favorite = true; item.prog.updatedAt = Date.now(); await put('progress', item.prog); }
+      btn.textContent = '✓ 已标记'; btn.classList.add('on');
+      toast('已标记不熟悉，明天复习并已收藏 ⭐');
+    }
   });
 
   const btns = body.querySelectorAll('.opt');
@@ -3162,15 +3185,23 @@ async function renderRecall() {
   document.getElementById('recallWord').addEventListener('click', () => speak(w.word));
   document.getElementById('recallPrevBtn').addEventListener('click', recallPrev);
   document.getElementById('recallNextBtn').addEventListener('click', recallNext);
-  // 回忆轮也能标记"不熟悉"：加入次日复习 + 自动收藏（与测验一致）
+  // 回忆轮也能标记 / 取消"不熟悉"：标记=加入次日复习+自动收藏；取消=移出池并同步移出收藏
   document.getElementById('recallUnfamBtn').addEventListener('click', async () => {
-    await addUnfamiliar(w.word);
-    // 回忆轮也要保证有进度记录，否则收藏写不进去
-    const prog = await getOrCreateProgress(w);
-    if (!prog.favorite) { prog.favorite = true; prog.updatedAt = Date.now(); await put('progress', prog); }
     const btn = document.getElementById('recallUnfamBtn');
-    btn.textContent = '✓ 已标记'; btn.classList.add('on');
-    toast('已标记不熟悉，明天复习并已收藏 ⭐');
+    if (await isUnfamiliar(w.word)) {
+      await removeUnfamiliar(w.word);
+      const prog = await getOrCreateProgress(w);
+      if (prog.favorite) { prog.favorite = false; prog.updatedAt = Date.now(); await put('progress', prog); }
+      btn.textContent = '不熟悉'; btn.classList.remove('on');
+      toast('已取消标记，并移出收藏');
+    } else {
+      await addUnfamiliar(w.word);
+      // 回忆轮也要保证有进度记录，否则收藏写不进去
+      const prog = await getOrCreateProgress(w);
+      if (!prog.favorite) { prog.favorite = true; prog.updatedAt = Date.now(); await put('progress', prog); }
+      btn.textContent = '✓ 已标记'; btn.classList.add('on');
+      toast('已标记不熟悉，明天复习并已收藏 ⭐');
+    }
   });
   savePending(session);
 }
@@ -3340,6 +3371,7 @@ function renderReview() {
     document.getElementById('starBtn').textContent = item.prog.favorite ? '⭐' : '☆';
     item.prog.updatedAt = Date.now();
     await put('progress', item.prog);
+    if (!item.prog.favorite) await removeUnfamiliar(item.prog.word); // 取消收藏 → 同步移出"不熟悉"池
     toast(item.prog.favorite ? '已收藏 ⭐' : '已取消收藏');
   });
   document.getElementById('scard').addEventListener('click', () => speak(w.word));
@@ -3391,7 +3423,10 @@ async function finishReview() {
     const w = WORD_MAP[p.word];
     // "不熟悉"词：只更新不熟悉池（认识 → 移出；不认识 → 保留，明日继续复习），不动学习进度
     if (it.extra) {
-      if (it.answered === true) await removeUnfamiliar(p.word);
+      if (it.answered === true && await removeUnfamiliar(p.word) && p.favorite) {
+        p.favorite = false; p.updatedAt = Date.now(); // 认识后同步移出收藏，保持"不熟悉=收藏"一致
+        await put('progress', p);
+      }
       continue;
     }
     const lastExp = p.lastReviewDate || p.learnedDate;
@@ -3410,10 +3445,12 @@ async function finishReview() {
     } else {
       p.nextReviewDate = tomorrow; // <80% 不晋级，强制明天再复习
     }
+    // 认识后若仍在"不熟悉"池，一并清除并同步移出收藏（可能之前标记过）
+    if (it.answered === true && await removeUnfamiliar(p.word) && p.favorite) {
+      p.favorite = false; // 保持"不熟悉=收藏"一致
+    }
     p.updatedAt = Date.now();
     await put('progress', p);
-    // 认识后若仍在"不熟悉"池，一并清除（可能之前标记过）
-    if (it.answered === true) await removeUnfamiliar(p.word);
   }
   await recordDailyStats(0, total, correct, total);
 
@@ -3493,6 +3530,7 @@ async function renderFav() {
   el.querySelectorAll('.unfav').forEach(b => b.addEventListener('click', async () => {
     const p = await get('progress', b.dataset.w);
     if (p) { p.favorite = false; p.updatedAt = Date.now(); await put('progress', p); }
+    await removeUnfamiliar(b.dataset.w); // 取消收藏 → 同步移出"不熟悉"池
     toast('已取消收藏');
     renderFav();
   }));
@@ -3524,14 +3562,19 @@ async function renderStats() {
       '<div class="stat-cell"><b>' + streak + '</b><span>连续天数</span></div>' +
     '</div></div>' +
     '<div class="home-card">' +
-      '<h3>📅 本月打卡</h3>' +
+      '<h3>📅 打卡日历</h3>' +
       '<div class="stat-grid4">' +
         '<div class="stat-cell"><b>' + ck.month + '</b><span>本月打卡</span></div>' +
         '<div class="stat-cell"><b>' + ck.total + '</b><span>累计打卡</span></div>' +
         '<div class="stat-cell"><b>' + streak + '</b><span>当前连续</span></div>' +
       '</div>' +
+      '<div class="ck-nav">' +
+        '<button id="ckPrev">‹ 上月</button>' +
+        '<span id="ckTitle"></span>' +
+        '<button id="ckNext">下月 ›</button>' +
+      '</div>' +
       '<div id="checkinGrid"></div>' +
-      '<div class="home-tip">完成一次学习即自动打卡 · 当天所学 List 会标在日期上</div>' +
+      '<div class="home-tip">完成一次学习即自动打卡 · 当天所学 List 会标在日期上 · 可翻看历史月份</div>' +
     '</div>' +
     '<div class="home-card">' +
       '<h3>🔥 近 90 天学习热力图</h3>' +
@@ -3569,11 +3612,15 @@ function calcCheckin(map) {
   return { month, total };
 }
 
+// 打卡日历当前浏览的月份（0 基），默认本月；可翻看历史月份 / 年份
+let ckView = null;
+
 function renderCheckinGrid(el, map, dateLists) {
   const box = el.querySelector('#checkinGrid');
   if (!box) return;
   const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
+  if (!ckView) ckView = { y: now.getFullYear(), m: now.getMonth() };
+  const y = ckView.y, m = ckView.m;
   const offset = (new Date(y, m, 1).getDay() + 6) % 7;   // 周一开始
   const daysInMonth = new Date(y, m + 1, 0).getDate();
   const today = todayISO();
@@ -3594,6 +3641,19 @@ function renderCheckinGrid(el, map, dateLists) {
   }
   html += '</div>';
   box.innerHTML = html;
+
+  // 月份标题
+  const title = el.querySelector('#ckTitle');
+  if (title) title.textContent = y + '年' + (m + 1) + '月';
+  // 翻月导航（onclick 属性赋值，避免重复绑定叠加）
+  const prev = el.querySelector('#ckPrev');
+  const next = el.querySelector('#ckNext');
+  const atCurrent = y === now.getFullYear() && m === now.getMonth();
+  if (next) {
+    next.disabled = atCurrent; // 本月不可再往后翻
+    next.onclick = () => { ckView.m++; if (ckView.m > 11) { ckView.m = 0; ckView.y++; } renderCheckinGrid(el, map, dateLists); };
+  }
+  if (prev) prev.onclick = () => { ckView.m--; if (ckView.m < 0) { ckView.m = 11; ckView.y--; } renderCheckinGrid(el, map, dateLists); };
 }
 
 function heatColor(n, max) {
