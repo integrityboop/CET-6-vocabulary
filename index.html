@@ -2368,9 +2368,11 @@ const DB_VERSION = 1;
 const PENDING_KEY = 'pendingNew';       // 未完成的新词学习会话（当天接着学用）
 const PENDING_REVIEW_KEY = 'pendingReview'; // 未完成的复习会话（当天接着复习用）
 const UNFAMILIAR_KEY = 'unfamiliarWords';    // "不熟悉"词池：在 List 总览 / 测验中点不熟悉，次日起加入复习
+const LAST_REVIEW_KEY = 'lastReviewResult';  // 最近一次复习结果：首页可反复点开查看"不熟悉单词"
 
 let db = null;
 let session = null; // 当前学习/复习会话
+let lastMissedRes = null; // 今日复习结果存档（首页"查看不熟悉单词"入口用）
 const favOpen = new Set(); // 收藏页当前已展开的 List 编号（页面刷新前保持）
 
 /* ---------- IndexedDB 封装 ---------- */
@@ -2640,6 +2642,7 @@ function refreshAll() { renderStudy(); renderLists(); renderFav(); renderStats()
    ===================================================================== */
 async function renderStudy() {
   const el = document.getElementById('page-study');
+  lastMissedRes = null; // 本次渲染的"不熟悉单词"存档（有则显示入口）
   const d = new Date();
   const wk = '日一二三四五六'[d.getDay()];
   const today = todayISO();
@@ -2662,7 +2665,27 @@ async function renderStudy() {
         '<button class="btn primary" id="startReviewBtn">' + (resumingReview ? '继续复习' : '开始复习') + '</button>' +
       '</div>';
   } else {
-    reviewHTML = '<div class="home-card"><div class="home-card-head"><h3>✅ 今日复习已完成</h3></div><p class="sub">' + today + ' 待复习队列为空</p></div>';
+    // 复习已完成：若今天刚复习过，保留入口可反复点开看"不熟悉单词"、也可再复习一遍
+    const lastRes = await loadLastReviewResult();
+    if (lastRes && ((lastRes.missed && lastRes.missed.length) || (lastRes.words && lastRes.words.length))) {
+      lastMissedRes = lastRes;
+      const missed = lastRes.missed || [];
+      const replayable = !!(lastRes.words && lastRes.words.length);
+      const mc = missed.slice(0, 12).map(m => '<span class="chip">' + esc(m.word) + '</span>').join('');
+      reviewHTML =
+        '<div class="home-card">' +
+          '<div class="home-card-head"><h3>✅ 今日复习已完成</h3>' +
+            (missed.length ? '<span class="count-badge">' + missed.length + ' 词不熟</span>' : '') +
+          '</div>' +
+          '<p class="sub">正确率 ' + Math.round(lastRes.correct / lastRes.total * 100) + '% · ' + lastRes.correct + '/' + lastRes.total + ' 词</p>' +
+          (missed.length ? '<div class="chips">' + mc + (missed.length > 12 ? '<span class="chip">+' + (missed.length - 12) + '</span>' : '') + '</div>' : '') +
+          (missed.length ? '<button class="btn primary" id="missedBtn">📖 查看不熟悉单词</button>' : '') +
+          (replayable ? '<button class="btn ghost" id="homeReplayBtn"' + (missed.length ? ' style="margin-top:12px"' : '') + '>再复习一遍 ↻</button>' : '') +
+          '<p class="sub" style="margin-top:8px">可反复点开翻看' + (missed.length ? '；这些词明天会再复习一次' : '') + (replayable ? '；再复习一遍只练习，不影响学习进度' : '') + '</p>' +
+        '</div>';
+    } else {
+      reviewHTML = '<div class="home-card"><div class="home-card-head"><h3>✅ 今日复习已完成</h3></div><p class="sub">' + today + ' 待复习队列为空</p></div>';
+    }
   }
 
   let newHTML;
@@ -2710,6 +2733,10 @@ async function renderStudy() {
 
   const rb = document.getElementById('startReviewBtn');
   if (rb) rb.addEventListener('click', startReviewSession);
+  const mb = document.getElementById('missedBtn');
+  if (mb) mb.addEventListener('click', () => openMissedView(lastMissedRes));
+  const hrb = document.getElementById('homeReplayBtn');
+  if (hrb) hrb.addEventListener('click', () => startReviewReplayFromResult(lastMissedRes));
   const nb = document.getElementById('startNewBtn');
   if (nb) nb.addEventListener('click', startNewSession);
   const rl = document.getElementById('relearnBtn');
@@ -2842,6 +2869,48 @@ async function loadPendingReview() {
 }
 async function clearPendingReview() { await del('settings', PENDING_REVIEW_KEY); }
 
+/* ---------- 复习结果存档：复习完后首页仍可反复点开"不熟悉单词"，仅当天有效 ---------- */
+async function saveLastReviewResult(res) { await setSetting(LAST_REVIEW_KEY, JSON.stringify(res)); }
+async function loadLastReviewResult() {
+  const raw = await getSetting(LAST_REVIEW_KEY);
+  if (!raw) return null;
+  try {
+    const o = JSON.parse(raw);
+    if (!o || o.date !== todayISO()) return null;
+    if (!o.words || !o.words.length) {
+      // 旧版存档没有 words：用今天复习过的进度记录还原，保证"再复习一遍"按钮可用
+      const progs = await getAll('progress');
+      o.words = progs.filter(p => p.lastReviewDate === o.date).map(p => ({ word: p.word, extra: false }));
+    }
+    return o;
+  } catch (e) { return null; }
+}
+
+/* 只读查看本次复习不认识的单词：不改动任何进度，可反复打开 */
+function openMissedView(res) {
+  const list = (res && res.missed) || [];
+  session = { mode: 'missed', phase: 'view' };   // 只读模式：退出时不会写任何存档
+  showSession();
+  document.getElementById('sessionTitle').textContent = '本次不熟悉单词 · ' + list.length + ' 词';
+  const body = document.getElementById('sessionBody');
+  body.innerHTML =
+    (list.length
+      ? list.map(m => {
+          const w = WORD_MAP[m.word] || {};
+          return '<div class="card" style="margin-bottom:12px;padding:16px" data-word="' + esc(m.word) + '">' +
+            '<div style="font-size:20px;font-weight:700">' + esc(m.word) + '</div>' +
+            (w.phonetic ? '<div class="phonetic">' + esc(w.phonetic) + '</div>' : '') +
+            '<div class="meaning">' + esc(m.meaning) + '</div>' +
+            exHTML(m.word) +
+          '</div>';
+        }).join('')
+      : '<div class="empty">本次复习全部认识，没有不熟悉的单词 🎉</div>') +
+    '<p class="hint" style="margin:14px 0 0">点击单词卡片可重新朗读</p>' +
+    '<button class="btn primary" id="missedBackBtn" style="margin-top:14px">返回首页</button>';
+  body.querySelectorAll('[data-word]').forEach(c => c.addEventListener('click', () => speak(c.dataset.word)));
+  document.getElementById('missedBackBtn').addEventListener('click', closeSession);
+}
+
 /* =====================================================================
    学新词（stage=0）：浏览 → 测验 → 晋级/重学
    ===================================================================== */
@@ -2915,6 +2984,8 @@ function showSession() {
     title = (session.mode === 'replay' ? '练习 · List ' : '学习新词 · List ') + (session.listIndex + 1) + ' · 回忆';
   } else if (session.mode === 'new') title = '学习新词 · List ' + (session.listIndex + 1);
   else if (session.mode === 'replay') title = '练习 · List ' + (session.listIndex + 1);
+  else if (session.mode === 'missed') title = '不熟悉单词';
+  else if (session.mode === 'review-replay') title = '复习巩固 · ' + session.queue.length + ' 词';
   else title = '复习旧词 · ' + session.queue.length + ' 词';
   document.getElementById('sessionTitle').textContent = title;
 }
@@ -3326,6 +3397,34 @@ async function startReviewSession() {
   renderReview();
 }
 
+/* 复习完成后：把同一批单词再走一遍（练习模式，不写进度） */
+function startReviewReplay(prevQueue) {
+  if (!prevQueue || !prevQueue.length) return;
+  session = {
+    mode: 'review-replay',
+    queue: prevQueue.map(it => ({ prog: it.prog, extra: it.extra, answered: null })),
+    index: 0, correctCount: 0, wrongCount: 0,
+    phase: 'card', history: []
+  };
+  showSession();
+  renderReview();
+}
+
+/* 首页"今日复习已完成"卡片：按存档单词重建队列，再复习一遍（练习模式，不写进度） */
+async function startReviewReplayFromResult(res) {
+  if (!res || !res.words || !res.words.length) { toast('今天还没有复习记录'); return; }
+  const queue = [];
+  for (const it of res.words) {
+    const w = WORD_MAP[it.word];
+    let p = await get('progress', it.word);
+    if (!p && w) p = buildProgress(w);
+    if (!p) continue;
+    queue.push({ prog: p, extra: !!it.extra, answered: null });
+  }
+  if (!queue.length) { toast('没有可复习的单词'); return; }
+  startReviewReplay(queue);
+}
+
 /* =====================================================================
    当天练习：List 已完成后再"重新学习"或"重新测试"（不影响学习进度）
    startPhase: 'browse' 重新学习（先浏览再测验） / 'quiz' 直接测验
@@ -3421,42 +3520,50 @@ async function finishReview() {
   const missed = session.queue.filter(it => it.answered === false).map(it => {
     const w = WORD_MAP[it.prog.word]; return { word: w.word, meaning: w.meaning };
   });
+  const isReplayReview = session.mode === 'review-replay';
 
-  for (const it of session.queue) {
-    const p = it.prog;
-    const w = WORD_MAP[p.word];
-    // "不熟悉"词：只更新不熟悉池（认识 → 移出；不认识 → 保留，明日继续复习），不动学习进度
-    if (it.extra) {
+  if (!isReplayReview) {
+    for (const it of session.queue) {
+      const p = it.prog;
+      const w = WORD_MAP[p.word];
+      // "不熟悉"词：只更新不熟悉池（认识 → 移出；不认识 → 保留，明日继续复习），不动学习进度
+      if (it.extra) {
+        if (it.answered === true && await removeUnfamiliar(p.word) && p.favorite) {
+          p.favorite = false; p.updatedAt = Date.now(); // 认识后同步移出收藏，保持"不熟悉=收藏"一致
+          await put('progress', p);
+        }
+        continue;
+      }
+      const lastExp = p.lastReviewDate || p.learnedDate;
+      const d = lastExp ? daysBetween(lastExp, today) : 0;
+      p.reviews = p.reviews || [];
+      p.reviews.push({ date: today, d: d, correct: it.answered === true });
+      if (p.reviews.length > 300) p.reviews = p.reviews.slice(-300);
+      p.lastReviewDate = today;
+      if (it.answered === true) p.rightCount++; else p.wrongCount++;
+      if (pass) {
+        if (p.stage < 6) {
+          const cur = p.stage;
+          p.stage = cur + 1;
+          p.nextReviewDate = (p.stage >= 6) ? null : addDaysISO(today, INTERVALS[p.stage]); // 用晋级后的新 stage 查间隔
+        }
+      } else {
+        p.nextReviewDate = tomorrow; // <80% 不晋级，强制明天再复习
+      }
+      // 认识后若仍在"不熟悉"池，一并清除并同步移出收藏（可能之前标记过）
       if (it.answered === true && await removeUnfamiliar(p.word) && p.favorite) {
-        p.favorite = false; p.updatedAt = Date.now(); // 认识后同步移出收藏，保持"不熟悉=收藏"一致
-        await put('progress', p);
+        p.favorite = false; // 保持"不熟悉=收藏"一致
       }
-      continue;
+      p.updatedAt = Date.now();
+      await put('progress', p);
     }
-    const lastExp = p.lastReviewDate || p.learnedDate;
-    const d = lastExp ? daysBetween(lastExp, today) : 0;
-    p.reviews = p.reviews || [];
-    p.reviews.push({ date: today, d: d, correct: it.answered === true });
-    if (p.reviews.length > 300) p.reviews = p.reviews.slice(-300);
-    p.lastReviewDate = today;
-    if (it.answered === true) p.rightCount++; else p.wrongCount++;
-    if (pass) {
-      if (p.stage < 6) {
-        const cur = p.stage;
-        p.stage = cur + 1;
-        p.nextReviewDate = (p.stage >= 6) ? null : addDaysISO(today, INTERVALS[p.stage]); // 用晋级后的新 stage 查间隔
-      }
-    } else {
-      p.nextReviewDate = tomorrow; // <80% 不晋级，强制明天再复习
-    }
-    // 认识后若仍在"不熟悉"池，一并清除并同步移出收藏（可能之前标记过）
-    if (it.answered === true && await removeUnfamiliar(p.word) && p.favorite) {
-      p.favorite = false; // 保持"不熟悉=收藏"一致
-    }
-    p.updatedAt = Date.now();
-    await put('progress', p);
+    await recordDailyStats(0, total, correct, total);
+    // 存档本次结果：首页"今日复习已完成"卡片可反复点开查看这些不熟悉单词、也可再复习一遍
+    await saveLastReviewResult({
+      date: today, total: total, correct: correct, pass: pass, missed: missed,
+      words: session.queue.map(it => ({ word: it.prog.word, extra: !!it.extra }))
+    });
   }
-  await recordDailyStats(0, total, correct, total);
 
   const body = document.getElementById('sessionBody');
   body.innerHTML =
@@ -3464,14 +3571,20 @@ async function finishReview() {
       '<div class="big-emoji">' + (pass ? '🌟' : '📖') + '</div>' +
       '<h2>' + (pass ? '复习通过，全部晋级' : '未达标') + '</h2>' +
       '<p class="rate">正确率 ' + Math.round(rate * 100) + '%</p>' +
-      '<p class="sub">' + correct + '/' + total + ' 词 · ' + (pass ? '每词 stage +1，按新间隔排下次复习' : '低于 80%，明天强制再次复习') + '</p>' +
+      '<p class="sub">' + correct + '/' + total + ' 词 · ' + (isReplayReview ? '巩固练习，不影响学习进度' : (pass ? '每词 stage +1，按新间隔排下次复习' : '低于 80%，明天强制再次复习')) + '</p>' +
       (missed.length ? '<div class="missed"><div class="missed-title">巩固一下</div>' +
         missed.map(m => '<div class="missed-item"><b>' + esc(m.word) + '</b><span>' + esc(m.meaning) + '</span></div>').join('') + '</div>' : '') +
     '</div>' +
+    (isReplayReview ? '' : '<button class="btn ghost" id="replayReviewBtn">再复习一遍 ↻</button>') +
     '<button class="btn primary" id="doneBtn">返回首页</button>';
+  if (!isReplayReview) {
+    document.getElementById('replayReviewBtn').addEventListener('click', () => startReviewReplay(session.queue));
+  }
   document.getElementById('doneBtn').addEventListener('click', closeSession);
-  await clearPendingReview(); // 复习完成，清除"继续复习"的残留进度
-  autoSync(); // 复习完后自动同步到云端（手机/电脑进度保持一致）
+  if (!isReplayReview) {
+    await clearPendingReview(); // 复习完成，清除"继续复习"的残留进度
+    autoSync(); // 复习完后自动同步到云端（手机/电脑进度保持一致）
+  }
 }
 
 /* =====================================================================
