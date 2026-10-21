@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>CET-6 六级词汇背诵</title>
-<!-- build: 2026-10-21 v3 (replay-anytime) -->
+<!-- build: 2026-10-21 v4 (replay-fallback) -->
 <style>
 /* ===================== 基础 / iOS 风格 ===================== */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -2369,7 +2369,7 @@ const PENDING_KEY = 'pendingNew';       // 未完成的新词学习会话（当�
 const PENDING_REVIEW_KEY = 'pendingReview'; // 未完成的复习会话（当天接着复习用）
 const UNFAMILIAR_KEY = 'unfamiliarWords';    // "不熟悉"词池：在 List 总览 / 测验中点不熟悉，次日起加入复习
 const LAST_REVIEW_KEY = 'lastReviewResult';  // 最近一次复习结果：首页可反复点开查看"不熟悉单词"
-const BUILD = 'v3 · 2026-10-21';             // 版本号：用于确认手机是否已加载最新文件
+const BUILD = 'v4 · 2026-10-21';             // 版本号：用于确认手机是否已加载最新文件
 
 let db = null;
 let session = null; // 当前学习/复习会话
@@ -2679,7 +2679,9 @@ async function renderStudy() {
             (missed.length ? '<span class="count-badge">' + missed.length + ' 词不熟</span>' : '') +
           '</div>' +
           '<p class="sub">' + (lastRes.legacy
-            ? '今天已复习 ' + lastRes.words.length + ' 词'
+            ? (lastRes.approximate
+                ? '今天已复习 ' + (lastRes.reviewCount || lastRes.words.length) + ' 词 · 已按最近记录挑 ' + lastRes.words.length + ' 词练习'
+                : '今天已复习 ' + lastRes.words.length + ' 词')
             : '正确率 ' + Math.round(lastRes.correct / lastRes.total * 100) + '% · ' + lastRes.correct + '/' + lastRes.total + ' 词') + '</p>' +
           (missed.length ? '<div class="chips">' + mc + (missed.length > 12 ? '<span class="chip">+' + (missed.length - 12) + '</span>' : '') + '</div>' : '') +
           (missed.length ? '<button class="btn primary" id="missedBtn">📖 查看不熟悉单词</button>' : '') +
@@ -2730,7 +2732,7 @@ async function renderStudy() {
   }
 
   el.innerHTML =
-    '<div class="page-head"><h1>今日学习</h1><p class="sub">' + (d.getMonth() + 1) + '月' + d.getDate() + '日 · 周' + wk + ' · List ' + Math.min(learnedIdx + 1, RAW_WORDS.length) + '/' + RAW_WORDS.length + '</p></div>' +
+    '<div class="page-head"><h1>今日学习</h1><p class="sub">' + (d.getMonth() + 1) + '月' + d.getDate() + '日 · 周' + wk + ' · List ' + Math.min(learnedIdx + 1, RAW_WORDS.length) + '/' + RAW_WORDS.length + ' · ' + BUILD + '</p></div>' +
     reviewHTML + newHTML +
     '<div class="home-tip">💡 艾宾浩斯间隔：1 → 2 → 4 → 7 → 15 天</div>';
 
@@ -2874,6 +2876,25 @@ async function clearPendingReview() { await del('settings', PENDING_REVIEW_KEY);
 
 /* ---------- 复习结果存档：复习完后首页仍可反复点开"不熟悉单词"，仅当天有效 ---------- */
 async function saveLastReviewResult(res) { await setSetting(LAST_REVIEW_KEY, JSON.stringify(res)); }
+
+// 找出"今天复习过"的单词：兼容旧版本可能只写了其中一种记录的情况
+async function findTodayReviewedWords(today) {
+  const progs = await getAll('progress');
+  const seen = new Set();
+  const words = [];
+  progs.forEach(p => {
+    const eligible = p.stage >= 1; // 排除"今天学了新词但没通过 / 只浏览过"的记录，避免误判成复习
+    const byDate = eligible && p.lastReviewDate === today;
+    const byReview = eligible && Array.isArray(p.reviews) && p.reviews.some(r => r && r.date === today);
+    const byUpdate = eligible && !!p.updatedAt && toISO(new Date(p.updatedAt)) === today && p.learnedDate !== today;
+    if ((byDate || byReview || byUpdate) && !seen.has(p.word)) {
+      seen.add(p.word);
+      words.push({ word: p.word, extra: false });
+    }
+  });
+  return words;
+}
+
 async function loadLastReviewResult() {
   const today = todayISO();
   let o = null;
@@ -2884,15 +2905,29 @@ async function loadLastReviewResult() {
   if (!o) {
     // 兼容旧版本（存档功能上线前就复习完的情况）：用今天复习过的进度记录还原，
     // 这样即使当时没写存档，首页也会出现"再复习一遍"按钮。
-    const progs = await getAll('progress');
-    const words = progs.filter(p => p.lastReviewDate === today).map(p => ({ word: p.word, extra: false }));
-    if (!words.length) return null;
-    return { date: today, total: words.length, correct: 0, pass: true, missed: [], words: words, legacy: true };
+    const words = await findTodayReviewedWords(today);
+    if (words.length) {
+      return { date: today, total: words.length, correct: 0, pass: true, missed: [], words: words, legacy: true };
+    }
+    // 再兜底：本机没有明细，但今天的统计里有复习记录（例如复习是在另一台设备完成的）。
+    // 按最近更新的已学单词挑一批出来做练习，保证按钮一定能出现。
+    const st = await get('stats', today);
+    if (st && st.reviewCount > 0) {
+      const progs = await getAll('progress');
+      const pick = progs.filter(p => p.stage >= 1 && p.learnedDate !== today)
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+        .slice(0, Math.min(st.reviewCount, 60))
+        .map(p => ({ word: p.word, extra: false }));
+      if (pick.length) {
+        return { date: today, total: pick.length, correct: 0, pass: true, missed: [], words: pick,
+                 legacy: true, approximate: true, reviewCount: st.reviewCount };
+      }
+    }
+    return null;
   }
   if (!o.words || !o.words.length) {
     // 旧版存档没有 words：用今天复习过的进度记录还原，保证"再复习一遍"按钮可用
-    const progs = await getAll('progress');
-    o.words = progs.filter(p => p.lastReviewDate === o.date).map(p => ({ word: p.word, extra: false }));
+    o.words = await findTodayReviewedWords(o.date);
   }
   return o;
 }
@@ -3964,6 +3999,23 @@ function stLocal(r) {
   return { date: r.date, newCount: r.new_count, reviewCount: r.review_count, correct: r.correct, total: r.total, updatedAt: r.updated_at || 0 };
 }
 
+/* 分批上传：进度表可能上千条，一次性 POST 容易超过网关体积上限而静默失败 */
+async function pushRows(url, headers, table, rows, chunkSize) {
+  const size = chunkSize || 100;
+  for (let i = 0; i < rows.length; i += size) {
+    const resp = await fetch(url + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: Object.assign({}, headers, { Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify(rows.slice(i, i + size))
+    });
+    if (!resp.ok) {
+      let detail = '';
+      try { detail = (await resp.text()).slice(0, 160); } catch (e) { /* ignore */ }
+      throw new Error(table + ' 上传失败 HTTP ' + resp.status + (detail ? '：' + detail : ''));
+    }
+  }
+}
+
 async function syncNow(silent) {
   const el = document.getElementById('syncStatus');
   const url = ((await getSetting('supabaseUrl')) || '').trim();
@@ -4031,16 +4083,10 @@ async function syncNow(silent) {
     await setSetting('learnedIndex', merged);
     const pushSet = [{ key: 'learnedIndex', value: String(merged), updated_at: Date.now() }];
 
-    // 推送（upsert）
-    if (pushP.length) await fetch(url + '/rest/v1/progress', {
-      method: 'POST', headers: Object.assign({}, headers, { Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(pushP)
-    });
-    if (pushS.length) await fetch(url + '/rest/v1/stats', {
-      method: 'POST', headers: Object.assign({}, headers, { Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(pushS)
-    });
-    if (pushSet.length) await fetch(url + '/rest/v1/settings', {
-      method: 'POST', headers: Object.assign({}, headers, { Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify(pushSet)
-    });
+    // 推送（upsert，分批避免单次请求过大）
+    await pushRows(url, headers, 'progress', pushP, 100);
+    await pushRows(url, headers, 'stats', pushS, 200);
+    await pushRows(url, headers, 'settings', pushSet, 10);
 
     await setSetting('lastSyncAt', Date.now());
     if (el) el.textContent = '同步完成 ✅ ' + new Date().toLocaleTimeString();
