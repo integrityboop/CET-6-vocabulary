@@ -10,7 +10,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>CET-6 六级词汇背诵</title>
-<!-- build: 2026-10-21 v4 (replay-fallback) -->
+<!-- build: 2026-10-29 v5 (quiz-favorite) -->
 <style>
 /* ===================== 基础 / iOS 风格 ===================== */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -231,9 +231,11 @@ body{
 #listTitle{font-size:15px;font-weight:600;color:#3C3C43}
 #listBody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 
-/* ===================== 测验：不熟悉按钮 ===================== */
+/* ===================== 测验 / 回忆：收藏按钮 ===================== */
 .unfam-pill{display:block;margin:12px auto 0;height:32px;padding:0 16px;border-radius:16px;border:none;background:#FFEBEA;color:#FF3B30;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
 .unfam-pill.on{background:rgba(52,199,89,.15);color:#1E8E3E}
+.unfam-pill.fav{background:rgba(255,149,0,.12);color:#C26A00}
+.unfam-pill.fav.on{background:rgba(255,204,0,.18);color:#9A6B00}
 </style>
 </head>
 <body>
@@ -2362,14 +2364,14 @@ const WORD_MAP = (() => { const m = {}; ALL_WORDS.forEach(w => { m[w.word] = w; 
 // 即 学完首次复习 +1 天，之后依次 +2 / +4 / +7 / +15 天；到达 stage 6 为掌握，不再安排复习。
 const INTERVALS = { 1: 1, 2: 2, 3: 4, 4: 7, 5: 15 };
 const NEW_PASS_RATE = 0.7;      // 学新词晋级线
-const REVIEW_PASS_RATE = 0.8;   // 复习晋级线
+const REVIEW_PASS_RATE = 0.8;   // 复习晋级线（严格大于 80% 才晋级）
 const DB_NAME = 'cet6_vocab_db';
 const DB_VERSION = 1;
 const PENDING_KEY = 'pendingNew';       // 未完成的新词学习会话（当天接着学用）
 const PENDING_REVIEW_KEY = 'pendingReview'; // 未完成的复习会话（当天接着复习用）
 const UNFAMILIAR_KEY = 'unfamiliarWords';    // "不熟悉"词池：在 List 总览 / 测验中点不熟悉，次日起加入复习
 const LAST_REVIEW_KEY = 'lastReviewResult';  // 最近一次复习结果：首页可反复点开查看"不熟悉单词"
-const BUILD = 'v4 · 2026-10-21';             // 版本号：用于确认手机是否已加载最新文件
+const BUILD = 'v5 · 2026-10-29';             // 版本号：用于确认手机是否已加载最新文件
 
 let db = null;
 let session = null; // 当前学习/复习会话
@@ -3158,7 +3160,6 @@ async function renderQuiz() {
   const total = session.queue.length;
   const correct = item.w.meaning;
   const answered = !!item.answered;
-  const unfamNow = await isUnfamiliar(item.w.word);
   const options = shuffle([correct].concat(pickDistractors(item.w.word, 3)));
   const canPrev = session.history && session.history.length > 0;
   const body = document.getElementById('sessionBody');
@@ -3169,7 +3170,7 @@ async function renderQuiz() {
       '<button class="star-btn" id="quizStarBtn">' + (item.prog.favorite ? '⭐' : '☆') + '</button>' +
       '<div class="word-big" id="quizWord">' + esc(item.w.word) + '</div>' +
       (item.w.phonetic ? '<div class="phonetic">' + esc(item.w.phonetic) + '</div>' : '') +
-      '<button class="unfam-pill' + (unfamNow ? ' on' : '') + '" id="quizUnfamBtn">' + (unfamNow ? '✓ 已标记' : '不熟悉') + '</button>' +
+      '<button class="unfam-pill fav' + (item.prog.favorite ? ' on' : '') + '" id="quizFavBtn">' + (item.prog.favorite ? '⭐ 已收藏' : '☆ 收藏') + '</button>' +
     '</div>' +
     '<div class="options">' +
       options.map(o => '<button class="opt" data-o="' + esc(o) + '"' + (answered ? ' disabled' : '') + '>' + esc(o) + '</button>').join('') +
@@ -3181,29 +3182,33 @@ async function renderQuiz() {
   speak(item.w.word);
   // 点单词可重新朗读
   document.getElementById('quizWord').addEventListener('click', () => speak(item.w.word));
+  // 右上角星标 + 下方"收藏"按钮：两处状态保持同步
+  const syncQuizFavUI = () => {
+    const star = document.getElementById('quizStarBtn');
+    const pill = document.getElementById('quizFavBtn');
+    if (star) star.textContent = item.prog.favorite ? '⭐' : '☆';
+    if (pill) {
+      pill.textContent = item.prog.favorite ? '⭐ 已收藏' : '☆ 收藏';
+      pill.classList.toggle('on', !!item.prog.favorite);
+    }
+  };
   document.getElementById('quizStarBtn').addEventListener('click', async (e) => {
     e.stopPropagation();
     item.prog.favorite = !item.prog.favorite;
-    document.getElementById('quizStarBtn').textContent = item.prog.favorite ? '⭐' : '☆';
     item.prog.updatedAt = Date.now();
     await put('progress', item.prog);
     if (!item.prog.favorite) await removeUnfamiliar(item.w.word); // 取消收藏 → 同步移出"不熟悉"池
+    syncQuizFavUI();
     toast(item.prog.favorite ? '已收藏 ⭐' : '已取消收藏');
   });
-  // 不熟悉：可标记 / 取消。标记=加入次日复习+自动收藏；取消=移出池并同步移出收藏
-  document.getElementById('quizUnfamBtn').addEventListener('click', async () => {
-    const btn = document.getElementById('quizUnfamBtn');
-    if (await isUnfamiliar(item.w.word)) {
-      await removeUnfamiliar(item.w.word);
-      if (item.prog.favorite) { item.prog.favorite = false; item.prog.updatedAt = Date.now(); await put('progress', item.prog); }
-      btn.textContent = '不熟悉'; btn.classList.remove('on');
-      toast('已取消标记，并移出收藏');
-    } else {
-      await addUnfamiliar(item.w.word);
-      if (!item.prog.favorite) { item.prog.favorite = true; item.prog.updatedAt = Date.now(); await put('progress', item.prog); }
-      btn.textContent = '✓ 已标记'; btn.classList.add('on');
-      toast('已标记不熟悉，明天复习并已收藏 ⭐');
-    }
+  // 下方"收藏"按钮：只切换收藏，不影响复习计划
+  document.getElementById('quizFavBtn').addEventListener('click', async () => {
+    item.prog.favorite = !item.prog.favorite;
+    item.prog.updatedAt = Date.now();
+    await put('progress', item.prog);
+    if (!item.prog.favorite) await removeUnfamiliar(item.w.word); // 取消收藏 → 同步移出"不熟悉"池
+    syncQuizFavUI();
+    toast(item.prog.favorite ? '已收藏 ⭐' : '已取消收藏');
   });
 
   const btns = body.querySelectorAll('.opt');
@@ -3220,6 +3225,7 @@ async function renderQuiz() {
         b.classList.add('wrong');
         btns.forEach(x => { if (x.dataset.o === correct) x.classList.add('right'); });
         await autoFavoriteWord(item); // 选错 → 自动加入收藏夹
+        syncQuizFavUI();              // 同步下方"收藏"按钮与星标状态
       }
       item.chosenWrong = isCorrect ? null : b.dataset.o;
       btns.forEach(x => x.disabled = true);
@@ -3286,7 +3292,7 @@ async function renderRecall() {
   const total = words.length;
   const w = words[session.rIndex];
   const canPrev = session.recallHistory && session.recallHistory.length > 0;
-  const unfamNow = await isUnfamiliar(w.word);
+  const prog = await getOrCreateProgress(w);
   const body = document.getElementById('sessionBody');
   body.innerHTML =
     '<div class="progress-row"><span>回忆 ' + (session.rIndex + 1) + ' / ' + total + '</span>' +
@@ -3295,7 +3301,7 @@ async function renderRecall() {
       '<div class="word-big" id="recallWord">' + esc(w.word) + '</div>' +
       (w.phonetic ? '<div class="phonetic">' + esc(w.phonetic) + '</div>' : '') +
     '</div>' +
-    '<button class="unfam-pill' + (unfamNow ? ' on' : '') + '" id="recallUnfamBtn">' + (unfamNow ? '✓ 已标记' : '不熟悉') + '</button>' +
+    '<button class="unfam-pill fav' + (prog.favorite ? ' on' : '') + '" id="recallFavBtn">' + (prog.favorite ? '⭐ 已收藏' : '☆ 收藏') + '</button>' +
     '<p class="hint">回想这个词的意思后点下一个 · 点卡片可重新朗读</p>' +
     '<div class="row2" style="margin-top:14px">' +
       '<button class="btn ghost" id="recallPrevBtn"' + (canPrev ? '' : ' disabled') + '>上一个</button>' +
@@ -3306,23 +3312,17 @@ async function renderRecall() {
   document.getElementById('recallWord').addEventListener('click', () => speak(w.word));
   document.getElementById('recallPrevBtn').addEventListener('click', recallPrev);
   document.getElementById('recallNextBtn').addEventListener('click', recallNext);
-  // 回忆轮也能标记 / 取消"不熟悉"：标记=加入次日复习+自动收藏；取消=移出池并同步移出收藏
-  document.getElementById('recallUnfamBtn').addEventListener('click', async () => {
-    const btn = document.getElementById('recallUnfamBtn');
-    if (await isUnfamiliar(w.word)) {
-      await removeUnfamiliar(w.word);
-      const prog = await getOrCreateProgress(w);
-      if (prog.favorite) { prog.favorite = false; prog.updatedAt = Date.now(); await put('progress', prog); }
-      btn.textContent = '不熟悉'; btn.classList.remove('on');
-      toast('已取消标记，并移出收藏');
-    } else {
-      await addUnfamiliar(w.word);
-      // 回忆轮也要保证有进度记录，否则收藏写不进去
-      const prog = await getOrCreateProgress(w);
-      if (!prog.favorite) { prog.favorite = true; prog.updatedAt = Date.now(); await put('progress', prog); }
-      btn.textContent = '✓ 已标记'; btn.classList.add('on');
-      toast('已标记不熟悉，明天复习并已收藏 ⭐');
-    }
+  // 回忆轮：只切换收藏，不影响复习计划
+  document.getElementById('recallFavBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('recallFavBtn');
+    const p = await getOrCreateProgress(w);
+    p.favorite = !p.favorite;
+    p.updatedAt = Date.now();
+    await put('progress', p);
+    if (!p.favorite) await removeUnfamiliar(w.word); // 取消收藏 → 同步移出"不熟悉"池
+    btn.textContent = p.favorite ? '⭐ 已收藏' : '☆ 收藏';
+    btn.classList.toggle('on', p.favorite);
+    toast(p.favorite ? '已收藏 ⭐' : '已取消收藏');
   });
   savePending(session);
 }
@@ -3560,7 +3560,7 @@ async function finishReview() {
   const total = session.queue.length;
   const correct = session.correctCount;
   const rate = correct / total;
-  const pass = rate >= REVIEW_PASS_RATE;
+  const pass = rate > REVIEW_PASS_RATE;   // 严格大于 80% 才晋级，否则明天重复习同一批
   const today = todayISO();
   const tomorrow = addDaysISO(today, 1);
   const missed = session.queue.filter(it => it.answered === false).map(it => {
@@ -3594,7 +3594,8 @@ async function finishReview() {
           p.nextReviewDate = (p.stage >= 6) ? null : addDaysISO(today, INTERVALS[p.stage]); // 用晋级后的新 stage 查间隔
         }
       } else {
-        p.nextReviewDate = tomorrow; // <80% 不晋级，强制明天再复习
+        // 未达 80%：不晋级，但按当前 stage 的间隔继续走遗忘曲线，不再强制明天重复习同一批
+        p.nextReviewDate = (p.stage >= 6) ? null : addDaysISO(today, INTERVALS[p.stage]);
       }
       // 认识后若仍在"不熟悉"池，一并清除并同步移出收藏（可能之前标记过）
       if (it.answered === true && await removeUnfamiliar(p.word) && p.favorite) {
@@ -3617,7 +3618,7 @@ async function finishReview() {
       '<div class="big-emoji">' + (pass ? '🌟' : '📖') + '</div>' +
       '<h2>' + (pass ? '复习通过，全部晋级' : '未达标') + '</h2>' +
       '<p class="rate">正确率 ' + Math.round(rate * 100) + '%</p>' +
-      '<p class="sub">' + correct + '/' + total + ' 词 · ' + (isReplayReview ? '巩固练习，不影响学习进度' : (pass ? '每词 stage +1，按新间隔排下次复习' : '低于 80%，明天强制再次复习')) + '</p>' +
+      '<p class="sub">' + correct + '/' + total + ' 词 · ' + (isReplayReview ? '巩固练习，不影响学习进度' : (pass ? '每词 stage +1，按新间隔排下次复习' : '未达 80%，本次不晋级，按遗忘曲线继续复习')) + '</p>' +
       (missed.length ? '<div class="missed"><div class="missed-title">巩固一下</div>' +
         missed.map(m => '<div class="missed-item"><b>' + esc(m.word) + '</b><span>' + esc(m.meaning) + '</span></div>').join('') + '</div>' : '') +
     '</div>' +
