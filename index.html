@@ -2371,7 +2371,7 @@ const PENDING_KEY = 'pendingNew';       // 未完成的新词学习会话（当�
 const PENDING_REVIEW_KEY = 'pendingReview'; // 未完成的复习会话（当天接着复习用）
 const UNFAMILIAR_KEY = 'unfamiliarWords';    // "不熟悉"词池：在 List 总览 / 测验中点不熟悉，次日起加入复习
 const LAST_REVIEW_KEY = 'lastReviewResult';  // 最近一次复习结果：首页可反复点开查看"不熟悉单词"
-const BUILD = 'v5 · 2026-10-29';             // 版本号：用于确认手机是否已加载最新文件
+const BUILD = 'v6 · 2026-10-31';             // 版本号：用于确认手机是否已加载最新文件
 
 let db = null;
 let session = null; // 当前学习/复习会话
@@ -2815,6 +2815,7 @@ async function openListDetail(listIndex) {
       b.textContent = '不熟悉'; b.classList.remove('on');
       toast('已取消标记，并移出收藏');
     }
+    syncAfterFav();
   }));
   document.getElementById('listView').classList.remove('hidden');
 }
@@ -3083,6 +3084,7 @@ async function renderBrowse() {
     await put('progress', item.prog);
     if (!item.prog.favorite) await removeUnfamiliar(item.w.word); // 取消收藏 → 同步移出"不熟悉"池
     toast(item.prog.favorite ? '已收藏 ⭐' : '已取消收藏');
+    syncAfterFav();
   });
   document.getElementById('scard').addEventListener('click', () => speak(item.w.word));
   // 浏览时也能标记 / 取消"不熟悉"：标记=加入次日复习+自动收藏；取消=移出池并同步移出收藏
@@ -3099,6 +3101,7 @@ async function renderBrowse() {
       btn.textContent = '✓ 已标记'; btn.classList.add('on');
       toast('已标记不熟悉，明天复习并已收藏 ⭐');
     }
+    syncAfterFav();
   });
   document.getElementById('prevBtn').addEventListener('click', () => { if (session.index > 0) { session.index--; renderBrowse(); } });
   document.getElementById('nextBtn').addEventListener('click', () => {
@@ -3200,6 +3203,7 @@ async function renderQuiz() {
     if (!item.prog.favorite) await removeUnfamiliar(item.w.word); // 取消收藏 → 同步移出"不熟悉"池
     syncQuizFavUI();
     toast(item.prog.favorite ? '已收藏 ⭐' : '已取消收藏');
+    syncAfterFav();
   });
   // 下方"收藏"按钮：只切换收藏，不影响复习计划
   document.getElementById('quizFavBtn').addEventListener('click', async () => {
@@ -3209,6 +3213,7 @@ async function renderQuiz() {
     if (!item.prog.favorite) await removeUnfamiliar(item.w.word); // 取消收藏 → 同步移出"不熟悉"池
     syncQuizFavUI();
     toast(item.prog.favorite ? '已收藏 ⭐' : '已取消收藏');
+    syncAfterFav();
   });
 
   const btns = body.querySelectorAll('.opt');
@@ -3323,6 +3328,7 @@ async function renderRecall() {
     btn.textContent = p.favorite ? '⭐ 已收藏' : '☆ 收藏';
     btn.classList.toggle('on', p.favorite);
     toast(p.favorite ? '已收藏 ⭐' : '已取消收藏');
+    syncAfterFav();
   });
   savePending(session);
 }
@@ -3352,6 +3358,15 @@ async function autoFavoriteWord(item) {
   item.prog.updatedAt = Date.now();
   await put('progress', item.prog);
   toast('已自动收藏 ⭐');
+  syncAfterFav();
+}
+
+// 收藏变更后尽快推云端（1.5 秒防抖）：只等 60 秒定时同步的话，
+// 手机点完收藏马上关页面，另一台设备就还看不到。
+let favSyncTimer = null;
+function syncAfterFav() {
+  clearTimeout(favSyncTimer);
+  favSyncTimer = setTimeout(() => { autoSync(true); }, 1500);
 }
 
 async function finishNew() {
@@ -3522,6 +3537,7 @@ function renderReview() {
     await put('progress', item.prog);
     if (!item.prog.favorite) await removeUnfamiliar(item.prog.word); // 取消收藏 → 同步移出"不熟悉"池
     toast(item.prog.favorite ? '已收藏 ⭐' : '已取消收藏');
+    syncAfterFav();
   });
   document.getElementById('scard').addEventListener('click', () => speak(w.word));
   document.getElementById('prevBtn').addEventListener('click', prevReviewWord);
@@ -3531,7 +3547,23 @@ function renderReview() {
     document.getElementById('nextBtn').addEventListener('click', nextWord);
   } else {
     document.getElementById('knowBtn').addEventListener('click', () => { item.answered = true; session.correctCount++; savePendingReview(session); nextWord(); });
-    document.getElementById('noBtn').addEventListener('click', () => { item.answered = false; session.wrongCount++; savePendingReview(session); renderReview(); });
+    // 复习旧词点"不认识" → 立即自动收藏（不用等整轮复习结束，中途退出也已保存）
+    document.getElementById('noBtn').addEventListener('click', async () => {
+      if (item.answered !== null) return;
+      item.answered = false;
+      session.wrongCount++;
+      if (!item.prog.favorite) {
+        item.prog.favorite = true;
+        item.prog.updatedAt = Date.now();
+        await put('progress', item.prog);
+        toast(item.extra ? '不认识，已自动收藏 ⭐（明日继续复习）' : '不认识 → 已自动收藏 ⭐');
+        syncAfterFav();
+      } else {
+        toast('不认识，已记录' + (item.extra ? '（明日继续复习）' : ''));
+      }
+      savePendingReview(session);
+      renderReview();
+    });
   }
   savePendingReview(session); // 记录复习进度，中途退出可继续
 }
@@ -3694,6 +3726,7 @@ async function renderFav() {
     if (p) { p.favorite = false; p.updatedAt = Date.now(); await put('progress', p); }
     await removeUnfamiliar(b.dataset.w); // 取消收藏 → 同步移出"不熟悉"池
     toast('已取消收藏');
+    syncAfterFav();
     renderFav();
   }));
 }
